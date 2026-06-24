@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Graveyard Shift at Sparkle's — Page 1</title>
+
+  <link rel="stylesheet" href="style.css">
+
+  <!-- ── Page-specific styles ── -->
+  <style>
+    #screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Double-border frame */
+    #frame {
+      position: relative;
+      z-index: 2;
+      width: min(88vw, 620px);
+      height: min(86vh, 620px);
+      border: 4px solid var(--accent);
+      outline: 8px solid var(--gb0);
+      box-shadow: 0 0 0 12px var(--accent-dk),
+                  0 0 28px rgba(var(--glow), 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+      background: var(--gb0);
+    }
+    /* small comic header tab */
+    #frame-tab {
+      position: absolute;
+      top: -14px; left: 50%; transform: translateX(-50%);
+      background: var(--accent); color: var(--gb0);
+      font-family: var(--font);
+      font-size: clamp(0.4rem, 0.9vw, 0.6rem);
+      letter-spacing: 0.22em;
+      padding: 2px 14px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      box-shadow: 0 0 10px rgba(var(--glow), 0.5);
+    }
+
+    /* Image panel */
+    #image-panel {
+      flex: 1.1;
+      border: 3px solid var(--gb3);
+      overflow: hidden;
+      position: relative;
+      background: var(--gb1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #image-panel img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+      image-rendering: pixelated;
+    }
+    .img-placeholder {
+      font-family: var(--font);
+      font-size: clamp(0.55rem, 1.4vw, 0.85rem);
+      color: var(--gb2);
+      opacity: 0.45;
+      letter-spacing: 0.12em;
+      user-select: none;
+    }
+
+    /* Text panel */
+    #text-panel {
+      flex: 0.9;
+      border: 3px solid var(--gb3);
+      display: flex;
+    }
+    #text-scroll {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 12px 14px;
+      scrollbar-width: none;
+    }
+    #text-scroll::-webkit-scrollbar { display: none; }
+    #text-scroll p {
+      font-family: var(--font);
+      font-size: clamp(0.5rem, 1.05vw, 0.72rem);
+      line-height: 2;
+      color: var(--gb3);
+      margin-bottom: 0.8em;
+    }
+    #text-scroll p:last-child { margin-bottom: 0; }
+    #text-scroll em { color: var(--gb2); font-style: normal; }
+
+    /* Custom scrollbar rail (matches sketch) */
+    #scrollbar-rail {
+      width: 12px;
+      flex-shrink: 0;
+      background: var(--gb1);
+      border-left: 2px solid var(--gb3);
+      position: relative;
+    }
+    #scrollbar-thumb {
+      position: absolute;
+      left: 1px;
+      width: 8px;
+      background: var(--gb3);
+      top: 0;
+      height: 40%;
+    }
+
+    /* Navigation row below frame */
+    #nav {
+      position: relative;
+      z-index: 2;
+      width: min(88vw, 620px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+    }
+    .nav-btn {
+      font-family: var(--font);
+      font-size: clamp(1rem, 2.5vw, 1.5rem);
+      color: var(--gb3);
+      background: none;
+      border: none;
+      cursor: none;
+      padding: 4px 10px;
+      opacity: 0.85;
+      transition: opacity 0.15s, transform 0.1s;
+      user-select: none;
+    }
+    .nav-btn:hover  { opacity: 1; }
+    .nav-btn:active { transform: scale(0.88); }
+    .nav-btn.dimmed { opacity: 0.22; pointer-events: none; }
+    #page-indicator {
+      font-family: var(--font);
+      font-size: clamp(0.45rem, 0.9vw, 0.6rem);
+      color: var(--gb2);
+      letter-spacing: 0.18em;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="screen">
+    <div class="gb-grid"></div>
+
+    <!-- decorative frame corners + drifting glyphs -->
+    <span class="corner tl"></span>
+    <span class="corner tr"></span>
+    <span class="corner bl"></span>
+    <span class="corner br"></span>
+    <span class="float-glyph" style="top:16%;left:7%;font-size:1.2rem;animation-delay:0.5s">✦</span>
+    <span class="float-glyph" style="top:70%;left:90%;font-size:1rem;animation-delay:2.2s">☾</span>
+
+    <!-- Double-border frame -->
+    <div id="frame">
+      <span id="frame-tab">Graveyard Shift — Page 1</span>
+
+      <!-- Image panel -->
+      <div id="image-panel">
+        <img src="./images/page1.png" alt="Page 1 illustration"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+        <span class="img-placeholder" style="display:none;">[ IMAGE ]</span>
+      </div>
+
+      <!-- Scrollable text panel with custom scrollbar -->
+      <div id="text-panel">
+        <div id="text-scroll">
+          <p>The fluorescent lights at <em>Sparkle's</em> hadn't worked right in years — they'd buzz twice, flicker once, and then settle into a greenish halflight that made everything look like the bottom of an aquarium.</p>
+          <p>Nobody who worked the graveyard shift talked about what they'd seen. Not out loud. You'd notice it in the way they checked their pockets before clocking out, patting each one twice as if counting something they didn't want to name.</p>
+          <p>The mop closet at the end of aisle nine smelled like cold concrete and something else — something that moved when you weren't looking at it. Everyone knew to clean around it. Nobody ever cleaned inside it.</p>
+          <p><span class="redacted">[ The last person who did never came back for their final paycheck. ]</span></p>
+          <p>The security footage from that night is kept on a drive in the manager's desk drawer. The drawer is locked with a padlock, not the standard key. Nobody remembers who put the padlock there.</p>
+        </div>
+        <div id="scrollbar-rail">
+          <div id="scrollbar-thumb"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Navigation arrows outside the frame -->
+    <nav id="nav">
+      <button id="btn-prev" class="nav-btn" aria-label="Previous page">&#x21D0;</button>
+      <span id="page-indicator"></span>
+      <button id="btn-next" class="nav-btn" aria-label="Next page">&#x21D2;</button>
+    </nav>
+
+    <!-- CRT effect divs (styled by global.css, markup lives here) -->
+    <div class="crt-scanlines"></div>
+    <div class="crt-vignette"></div>
+    <div class="crt-bevel"></div>
+    <div class="crt-corners"></div>
+    <div class="crt-hline"></div>
+  </div>
+
+  <!-- Required by global.js -->
+  <canvas id="debris-canvas"></canvas>
+  <div id="cursor-layer"></div>
+
+  <script src="main.js"></script>
+
+  <!-- ── Page-specific script ── -->
+  <script>
+    /* Page navigation */
+    (function() {
+      const PAGES = ['index.html', 'page1.html'];
+      const cur   = PAGES.indexOf(location.pathname.split('/').pop());
+
+      const btnPrev   = document.getElementById('btn-prev');
+      const btnNext   = document.getElementById('btn-next');
+      const indicator = document.getElementById('page-indicator');
+
+      if (indicator) indicator.textContent = (cur + 1) + ' / ' + PAGES.length;
+      if (btnPrev && cur <= 0)                btnPrev.classList.add('dimmed');
+      if (btnNext && cur >= PAGES.length - 1) btnNext.classList.add('dimmed');
+
+      function go(delta) { const t = PAGES[cur + delta]; if (t) location.href = t; }
+      if (btnPrev) btnPrev.addEventListener('click', () => go(-1));
+      if (btnNext) btnNext.addEventListener('click', () => go(+1));
+      document.addEventListener('keydown', e => {
+        if (e.key === 'ArrowLeft')  go(-1);
+        if (e.key === 'ArrowRight') go(+1);
+      });
+    })();
+
+    /* Scrollbar thumb sync */
+    (function() {
+      const scroller = document.getElementById('text-scroll');
+      const thumb    = document.getElementById('scrollbar-thumb');
+      if (!scroller || !thumb) return;
+      function sync() {
+        const ratio  = scroller.scrollTop / (scroller.scrollHeight - scroller.clientHeight || 1);
+        const thumbH = Math.max(scroller.clientHeight * (scroller.clientHeight / scroller.scrollHeight), 28);
+        thumb.style.height = thumbH + 'px';
+        thumb.style.top    = ratio * (scroller.clientHeight - thumbH) + 'px';
+      }
+      scroller.addEventListener('scroll', sync, { passive: true });
+      window.addEventListener('resize', sync);
+      sync();
+    })();
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,2073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASYMMETRY</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  /* ── ASYMMETRY twist: warm crimson + amber + gold tactical palette ──
+     (overrides the shared GSaS lavender; --gb* names kept so all
+      existing markup + canvas re-skins to this hot, tense theme) */
+  :root {
+    --gb0: #14100c;   /* warm near-black battlefield */
+    --gb1: #6e2a2a;   /* dark crimson — borders       */
+    --gb2: #d98a3d;   /* ember amber — accents        */
+    --gb3: #f3d27a;   /* hot gold — primary text      */
+    --accent:    #c8643c;
+    --accent-dk: #5c1d12;
+    --glow:      216, 138, 61;   /* amber glow */
+  }
+  /* Force cursor:none — overrides browser default on buttons/inputs */
+  *, *::before, *::after { cursor: none !important; }
+
+  /* decorations: warmer panels + clearer interactive affordances */
+  #ui-top { box-shadow: 0 2px 14px rgba(0,0,0,0.6); }
+  #killer-panel, .survivor-card {
+    border-radius: 3px;
+    transition: border-color 0.15s, box-shadow 0.2s, transform 0.1s;
+  }
+  #killer-panel:hover, .survivor-card:hover {
+    border-color: var(--gb2) !important;
+    box-shadow: 0 0 12px rgba(var(--glow), 0.4);
+    transform: translateY(-1px);
+  }
+  #restart-btn, #pm-start-btn { border-radius: 3px; }
+  #restart-btn:focus-visible, #pm-start-btn:focus-visible {
+    outline: 2px dashed var(--gb3); outline-offset: 3px;
+  }
+</style>
+</head>
+<body>
+<div id="screen">
+  <div class="gb-grid"></div>
+  <div id="ui-top">
+    <div id="killer-panel">
+      <h3>KILLER</h3>
+      <div class="hp-bar"><div class="hp-fill green" id="k-hp" style="width:100%"></div></div>
+      <div style="font-size:8px;color:var(--gb2);margin-bottom:2px" id="k-hp-txt">1000 / 1000</div>
+      <div class="skill-pips" id="k-skills"></div>
+      <div style="font-size:8px;color:var(--gb1);margin-top:2px" id="k-status"></div>
+    </div>
+    <div id="survivors-panel"></div>
+    <div id="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#d98a3d"></div>Killer</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f3d27a"></div>Eng</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#6e2a2a"></div>Brawler</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f3d27a"></div>Esc</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#d98a3d"></div>Medic</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f3d27a"></div>Recon</div>
+    </div>
+  </div>
+  <div id="canvas-wrap">
+    <canvas id="c"></canvas>
+    <div id="log"><div id="log-inner"></div></div>
+    <div id="speed-control">
+      <label>SPD <input type="range" id="speed-input" min="0.2" max="5" step="0.1" value="1"> <span id="speed-val">1x</span></label>
+    </div>
+    <div id="overlay" style="display:none;">
+      <div id="overlay-box">
+        <h1 id="overlay-title">GAME OVER</h1>
+        <p id="overlay-detail"></p>
+        <button id="restart-btn" onclick="openPrematch()">BACK TO MENU</button>
+      </div>
+    </div>
+  </div>
+  <div id="prematch">
+    <div id="pm-header">
+      <div>
+        <div id="pm-title">ASYMMETRY</div>
+        <div id="pm-subtitle">PRE-MATCH CONFIGURATION</div>
+      </div>
+      <div style="font-size:8px;color:var(--gb1);text-align:right;letter-spacing:1px;">CLICK A CARD TO POSSESS · WASD MOVE · HJKL SKILLS · ESC RELEASE</div>
+    </div>
+    <div id="pm-body">
+      <div id="pm-nav">
+        <button class="pm-nav-btn active" onclick="pmTab('map')">MAP</button>
+        <button class="pm-nav-btn" onclick="pmTab('match')">MATCH</button>
+        <button class="pm-nav-btn" onclick="pmTab('killer')">KILLER</button>
+        <button class="pm-nav-btn" onclick="pmTab('survivors')">SURVIVORS</button>
+        <button class="pm-nav-btn" onclick="pmTab('statuses')">STATUSES</button>
+      </div>
+      <div id="pm-panels">
+
+        <!-- MAP TAB -->
+        <div class="pm-panel active" id="pm-panel-map">
+          <div class="pm-section">
+            <div class="pm-section-title">MAP SEED</div>
+            <div id="pm-seed-row">
+              <input class="pm-input pm-input-wide" id="pm-seed-input" type="text" placeholder="random seed…" />
+              <button class="pm-btn" onclick="pmRegenerateSeed()">GENERATE</button>
+              <span class="pm-seed-out" id="pm-seed-display"></span>
+            </div>
+            <canvas id="pm-map-canvas" width="420" height="260"></canvas>
+          </div>
+        </div>
+
+        <!-- MATCH TAB -->
+        <div class="pm-panel" id="pm-panel-match">
+          <div class="pm-section">
+            <div class="pm-section-title">MATCH SETTINGS</div>
+            <div class="pm-row"><span class="pm-label">SURVIVORS COUNT</span><input class="pm-input" id="pm-surv-count" type="number" min="1" max="26" value="11"/></div>
+            <div class="pm-row"><span class="pm-label">DURATION (SEC)</span><input class="pm-input" id="pm-duration" type="number" min="30" max="900" value="180"/></div>
+            <div class="pm-row"><span class="pm-label">SIM SPEED</span><input class="pm-input" id="pm-simspeed" type="number" min="0.2" max="5" step="0.1" value="1"/></div>
+          </div>
+          <div class="pm-section">
+            <div class="pm-section-title">SURVIVOR KITS (order of assignment)</div>
+            <div id="pm-kit-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+            <button class="pm-btn pm-btn-sm" style="margin-top:6px;" onclick="pmAddKit()">+ ADD ROW</button>
+            <div class="pm-section">
+            <div class="pm-section-title">RINGMASTER MODE</div>
+            <div style="font-size:8px;color:var(--gb1);margin-bottom:6px;letter-spacing:1px;">
+              Press <b style="color:var(--gb2)">R</b> in-game to toggle. Click canvas to place.<br>
+              <b style="color:var(--gb2)">1</b>=Trap &nbsp;<b style="color:var(--gb2)">2</b>=Wall &nbsp;<b style="color:var(--gb2)">3</b>=Floor &nbsp;<b style="color:var(--gb2)">4</b>=Spawn Survivor &nbsp;<b style="color:var(--gb2)">5</b>=Move Killer<br>
+              Right-click to remove traps/mines. Kit select: Q/W/E/A/S/D/Z/X/C/V
+            </div>
+          </div>
+
+        <!-- KILLER TAB -->
+        <div class="pm-panel" id="pm-panel-killer">
+          <div class="pm-section">
+            <div class="pm-section-title">KILLER STATS</div>
+            <div class="pm-row"><span class="pm-label">MAX HP</span><input class="pm-input" id="pm-k-hp" type="number" min="100" max="99999" value="1000"/></div>
+            <div class="pm-row"><span class="pm-label">BASE SPEED</span><input class="pm-input" id="pm-k-speed" type="number" min="10" max="500" value="53"/></div>
+            <div class="pm-row"><span class="pm-label">GRAB COOLDOWN</span><input class="pm-input" id="pm-k-grabcd" type="number" min="1" max="120" value="15"/></div>
+            <div class="pm-row"><span class="pm-label">MINE COOLDOWN</span><input class="pm-input" id="pm-k-minecd" type="number" min="1" max="120" value="18"/></div>
+            <div class="pm-row"><span class="pm-label">RAGE COOLDOWN</span><input class="pm-input" id="pm-k-ragecd" type="number" min="1" max="120" value="30"/></div>
+            <div class="pm-row"><span class="pm-label">RAGE DURATION</span><input class="pm-input" id="pm-k-ragedur" type="number" min="1" max="120" value="10"/></div>
+            <div class="pm-row"><span class="pm-label">MAX MINES</span><input class="pm-input" id="pm-k-maxmines" type="number" min="1" max="20" value="6"/></div>
+          </div>
+          <div class="pm-section">
+            <div class="pm-section-title">INITIAL STATUSES FOR KILLER</div>
+            <div id="pm-killer-statuses"></div>
+          </div>
+        </div>
+
+        <!-- SURVIVORS TAB -->
+        <div class="pm-panel" id="pm-panel-survivors">
+          <div class="pm-section">
+            <div class="pm-section-title">PER-KIT BASE STATS</div>
+            <div id="pm-surv-stats"></div>
+          </div>
+        </div>
+
+        <!-- STATUSES TAB -->
+        <div class="pm-panel" id="pm-panel-statuses">
+          <div class="pm-section">
+            <div class="pm-section-title">STATUS EFFECT DURATIONS (GLOBAL DEFAULTS)</div>
+            <div style="font-size:7px;color:var(--gb1);margin-bottom:8px;letter-spacing:1px;">These override base durations when statuses are applied mid-game. Toggle PERM to make them never expire.</div>
+            <div id="pm-status-dur-list"></div>
+          </div>
+        </div>
+
+      </div><!-- #pm-panels -->
+    </div><!-- #pm-body -->
+    <div id="pm-footer">
+      <button id="pm-reset-btn" onclick="pmResetDefaults()">↺ RESET TO DEFAULT</button>
+      <div style="font-size:8px;color:var(--gb1);letter-spacing:1px;">SEED: <span id="pm-footer-seed" style="color:var(--gb2);">—</span></div>
+      <button id="pm-start-btn" onclick="pmLaunch()">▶ START SIMULATION</button>
+    </div>
+  </div>
+  <div class="crt-scanlines"></div>
+  <div class="crt-vignette"></div>
+  <div class="crt-bevel"></div>
+  <div class="crt-hline"></div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<canvas id="debris-canvas"></canvas>
+<div id="cursor-layer"></div>
+
+<!-- ── Core engine: audio, camera, navmesh, status system, particles, game state ── -->
+<script>
+
+const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+
+const ambient = new Audio('music/Ambient1.mp3');
+ambient.loop = true;
+ambient.volume = 0.5;
+
+const lmsTracks = {
+  engineer: new Audio('music/LMSEngineer.mp3'),
+  escapee:  new Audio('music/LMSEscapee.mp3'),
+  medic:    new Audio('music/LMSMedic.mp3'),
+  brawler:  new Audio('music/LMSBrawler.mp3'),
+  recon:    new Audio('music/LMSRecon.mp3'),
+  commander: new Audio('music/LMSCommander.mp3'),
+  trapmaker: new Audio('music/LMSTrapmaker.mp3'),
+  assault:   new Audio('music/LMSAssault.mp3'),
+  golfer:    new Audio('music/LMSGolfer.mp3'),
+  sniper:    new Audio('music/LMSSniper.mp3'),
+};
+Object.values(lmsTracks).forEach(t=>{ t.volume=0.7; });
+
+let lmsTrackActive=false;
+
+let currentBPM=120;
+let activeMusicKey='ambient';
+
+
+const drumOnsets={};
+
+
+const cameraBeat={
+  swingPhase:0,
+  swingAmt:0,
+  targetSwingAmt:0,
+  bobImpulse:0,
+  zoomImpulse:0,
+  bobAmt:0,
+  zoomAmt:0,
+};
+
+
+const CAMERA_MODES = ['normal', 'action', 'individual'];
+// LMS camera state
+const lmsCam = {
+  active: false,
+  slowTimer: 0,       // remaining slow-mo seconds
+  slowTarget: 1,      // target slow factor (1=normal, 0.22=slow)
+  slowFactor: 1,      // smoothed
+  barAlpha: 0,        // cinematic bars alpha
+  barTarget: 0,
+  focusEntity: null,  // entity to focus on during action
+  drumIntensity: 0,   // smoothed beat intensity for auto-cut
+  lastCutTime: 0,     // gameTimer at last cut
+  cutCooldown: 0,     // seconds before next auto-cut allowed
+  lastDrumWasHit: false,
+};
+const cameraState = {
+  mode: 'normal',          
+  cx: 0, cy: 0,            
+  zoom: 1,                 
+  targetCX: 0, targetCY: 0,
+  targetZoom: 1,
+  individualIdx: 0,        
+  initialized: false,
+};
+
+
+async function detectDrumOnsets(audioEl, key){
+  try {
+    const response = await fetch(audioEl.src);
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    const sampleRate = audioBuffer.sampleRate;
+
+    
+    let mono;
+    if(audioBuffer.numberOfChannels>=2){
+      const L=audioBuffer.getChannelData(0);
+      const R=audioBuffer.getChannelData(1);
+      mono=new Float32Array(L.length);
+      for(let i=0;i<L.length;i++) mono[i]=(L[i]+R[i])*0.5;
+    } else {
+      mono=audioBuffer.getChannelData(0).slice();
+    }
+
+    
+    const lpSize=Math.floor(sampleRate/200); 
+    const lp=new Float32Array(mono.length);
+    let acc=0;
+    for(let i=0;i<lpSize;i++) acc+=Math.abs(mono[i]);
+    lp[0]=acc/lpSize;
+    for(let i=1;i<mono.length-lpSize;i++){
+      acc+=Math.abs(mono[i+lpSize-1])-Math.abs(mono[i-1]);
+      lp[i]=acc/lpSize;
+    }
+
+    
+    const winSize=Math.floor(sampleRate*0.01);
+    const energies=[];
+    for(let i=0;i<lp.length-winSize;i+=winSize){
+      let e=0;
+      for(let j=0;j<winSize;j++) e+=lp[i+j]*lp[i+j];
+      energies.push({e:e/winSize, t:i/sampleRate});
+    }
+
+    
+    const histLen=30; 
+    const minGap=Math.floor(0.10/(winSize/sampleRate)); 
+    const onsets=[];
+    let lastOnset=-999;
+    for(let i=histLen;i<energies.length;i++){
+      let avg=0,mx=0;
+      for(let j=i-histLen;j<i;j++){avg+=energies[j].e;mx=Math.max(mx,energies[j].e);}
+      avg/=histLen;
+      const threshold=avg*1.55+mx*0.18;
+      if(energies[i].e>threshold&&(i-lastOnset)>minGap){
+        onsets.push(energies[i].t);
+        lastOnset=i;
+      }
+    }
+
+    drumOnsets[key]=onsets;
+    
+    if(onsets.length>4){
+      const iois=[];
+      for(let i=1;i<onsets.length;i++){
+        const d=onsets[i]-onsets[i-1];
+        if(d>0.2&&d<2.0) iois.push(d);
+      }
+      iois.sort((a,b)=>a-b);
+      const medianIOI=iois[Math.floor(iois.length/2)]||0.5;
+      let bpm=Math.round(60/medianIOI);
+      while(bpm<60) bpm*=2;
+      while(bpm>180) bpm/=2;
+      currentBPM=bpm;
+      addLog(`Drums detected [${key}]: ${onsets.length} hits, ~${bpm}BPM`,'skill');
+    }
+  } catch(e){
+    console.warn('Drum detection failed for',key,e);
+    drumOnsets[key]=[];
+  }
+}
+
+function preloadAndDetectBPMs(){
+  detectDrumOnsets(ambient,'ambient');
+  for(const [key,track] of Object.entries(lmsTracks)){
+    detectDrumOnsets(track,key);
+  }
+}
+
+
+const DRUM_LATENCY_OFFSET = -0.08;
+
+
+function checkDrumHit(){
+  const trackEl=activeMusicKey==='ambient'?ambient:activeMusicKey==='death'?deathTrack:lmsTracks[activeMusicKey];
+  if(!trackEl||trackEl.paused) return false;
+  const onsets=drumOnsets[activeMusicKey];
+  if(!onsets||!onsets.length) return false;
+  const t=trackEl.currentTime - DRUM_LATENCY_OFFSET;
+  const tolerance=0.055;
+  
+  let lo=0,hi=onsets.length-1;
+  while(lo<hi){ const mid=(lo+hi)>>1; if(onsets[mid]<t-tolerance) lo=mid+1; else hi=mid; }
+  return Math.abs(onsets[lo]-t)<tolerance;
+}
+
+const deathTrack = new Audio('music/Death.mp3');
+deathTrack.loop = true;
+deathTrack.volume = 0.7;
+
+function fadeAudio(trackEl, targetVol, durationMs, onDone){
+  const start=performance.now();
+  const startVol=trackEl.volume;
+  function step(now){
+    const t=Math.min(1,(now-start)/durationMs);
+    trackEl.volume=Math.max(0,Math.min(1,startVol+(targetVol-startVol)*t));
+    if(t<1) requestAnimationFrame(step);
+    else { trackEl.volume=Math.max(0,Math.min(1,targetVol)); if(onDone) onDone(); }
+  }
+  requestAnimationFrame(step);
+}
+
+function startAmbient(){
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  ambient.currentTime=0;
+  ambient.volume=0;
+  ambient.play().catch(()=>{});
+  fadeAudio(ambient,0.5,1200);
+  activeMusicKey='ambient';
+  currentBPM=120;
+  cameraBeat.targetSwingAmt=0.8;
+}
+
+let deathTrackActive=false;
+
+function startDeathTrack(){
+  if(deathTrackActive) return;
+  deathTrackActive=true;
+  fadeAudio(ambient,0,800,()=>{ ambient.pause(); ambient.volume=0.5; });
+  deathTrack.currentTime=0;
+  deathTrack.volume=0;
+  deathTrack.play().catch(()=>{});
+  fadeAudio(deathTrack,0.7,1000);
+  activeMusicKey='death';
+  cameraBeat.targetSwingAmt=1.4;
+  addLog('KING OF RULES — Death theme playing!','kill');
+  detectDrumOnsets(deathTrack,'death');
+}
+
+function stopDeathTrack(){
+  if(!deathTrackActive) return;
+  deathTrackActive=false;
+  fadeAudio(deathTrack,0,900,()=>{ deathTrack.pause(); deathTrack.currentTime=0; deathTrack.volume=0.7; });
+  if(!lmsTrackActive){
+    ambient.volume=0;
+    ambient.currentTime=0;
+    ambient.play().catch(()=>{});
+    fadeAudio(ambient,0.5,1000);
+    activeMusicKey='ambient';
+    cameraBeat.targetSwingAmt=0.8;
+  }
+}
+
+function triggerLMS(kit){
+  if(lmsTrackActive) return;
+  lmsTrackActive=true;
+  fadeAudio(ambient,0,700,()=>{ ambient.pause(); ambient.volume=0.5; });
+  const track=lmsTracks[kit];
+  if(!track) return;
+  track.currentTime=0;
+  track.volume=0;
+  track.play().catch(()=>{});
+  fadeAudio(track,0.7,1000);
+  activeMusicKey=kit;
+  currentBPM=120;
+  cameraBeat.targetSwingAmt=2.0;
+  lmsCam.active=true;
+  lmsCam.focusEntity=null;
+  lmsCam.slowTimer=0;
+  lmsCam.slowFactor=1;
+  lmsCam.barAlpha=0;
+  lmsCam.barTarget=0;
+  lmsCam.drumIntensity=0;
+  lmsCam.cutCooldown=0;
+  cameraState.mode='lms-cam';
+  addLog('LMS CAMERA ACTIVATED — dynamic mode','skill');
+  triggerLMSFlash();
+  _initWaveform(track);
+  const applyDuration=()=>{
+    if(track.duration&&isFinite(track.duration)){
+      gameDuration=gameTimer+track.duration;
+      addLog(`LMS — ${kit.toUpperCase()} theme (${track.duration.toFixed(1)}s, ${currentBPM}BPM)`,'skill');
+    }
+  };
+  if(track.readyState>=1) applyDuration();
+  else track.addEventListener('loadedmetadata', applyDuration, {once:true});
+}
+
+function stopAllMusic(){
+  const allTracks=[ambient,deathTrack,...Object.values(lmsTracks)];
+  allTracks.forEach(t=>{ if(!t.paused) fadeAudio(t,0,600,()=>{ t.pause(); t.volume=t===ambient?0.5:0.7; }); });
+  lmsTrackActive=false;
+  cameraBeat.targetSwingAmt=0;
+}
+
+function updateCameraBeat(dt){
+  
+  const beatsPerSec=(currentBPM||120)/60;
+  cameraBeat.swingPhase=(cameraBeat.swingPhase+beatsPerSec*dt)%(Math.PI*2);
+  const k=1-Math.exp(-3*dt);
+  cameraBeat.swingAmt+=(cameraBeat.targetSwingAmt-cameraBeat.swingAmt)*k;
+
+  
+  if(checkDrumHit()){
+    cameraBeat.bobImpulse=lmsTrackActive?4.5:2.2;
+    cameraBeat.zoomImpulse=lmsTrackActive?0.012:0.006;
+  }
+
+  
+  const decayK=1-Math.exp(-18*dt);
+  cameraBeat.bobAmt+=(cameraBeat.bobImpulse-cameraBeat.bobAmt)*decayK;
+  cameraBeat.zoomAmt+=(cameraBeat.zoomImpulse-cameraBeat.zoomAmt)*decayK;
+  cameraBeat.bobImpulse*=Math.exp(-22*dt);
+  cameraBeat.zoomImpulse*=Math.exp(-22*dt);
+}
+
+
+function updateCameraMode(dt){
+  if(!killer) return;
+
+  if(!cameraState.initialized){
+    cameraState.cx=W/2; cameraState.cy=H/2; cameraState.zoom=1;
+    cameraState.initialized=true;
+  }
+
+  if(deathCameraEvent){
+    
+    const elapsed=3.0-deathCameraEvent.timer;
+    const zoomProgress=Math.min(1,elapsed/0.40);
+    cameraState.targetCX=deathCameraEvent.x;
+    cameraState.targetCY=deathCameraEvent.y;
+    cameraState.targetZoom=1+zoomProgress*3.8;
+  } else if(cameraState.mode==='normal'){
+    cameraState.targetCX=W/2;
+    cameraState.targetCY=H/2;
+    cameraState.targetZoom=1;
+
+  } else if(cameraState.mode==='lms-cam'){
+    _updateLMSCamera(dt);
+
+  } else if(cameraState.mode==='action'){
+    
+    const hot=[killer];
+    const alive=survivors.filter(s=>s.alive);
+    for(const s of alive){
+      const kd=Math.hypot(s.x-killer.x,s.y-killer.y);
+      const isHot=kd<380||s.currentlyChased||hasStatus(s,'grabbed')||
+                  s.alertLevel>1.5||(s.statuses&&Object.keys(s.statuses).length>0);
+      if(isHot) hot.push(s);
+    }
+    
+    const sorted=alive.slice().sort((a,b)=>
+      Math.hypot(a.x-killer.x,a.y-killer.y)-Math.hypot(b.x-killer.x,b.y-killer.y)
+    );
+    for(let i=0;i<Math.min(3,sorted.length);i++){
+      if(!hot.includes(sorted[i])) hot.push(sorted[i]);
+    }
+    
+    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    for(const e of hot){
+      minX=Math.min(minX,e.x); maxX=Math.max(maxX,e.x);
+      minY=Math.min(minY,e.y); maxY=Math.max(maxY,e.y);
+    }
+    const PAD=160;
+    const bboxW=(maxX-minX)+PAD*2;
+    const bboxH=(maxY-minY)+PAD*2;
+    const zoomFit=Math.min(W/Math.max(bboxW,1), H/Math.max(bboxH,1), 4.5);
+    cameraState.targetCX=(minX+maxX)/2;
+    cameraState.targetCY=(minY+maxY)/2;
+    cameraState.targetZoom=Math.max(0.9, zoomFit);
+
+  } else if(cameraState.mode==='individual'){
+    const entityList=[killer,...survivors.filter(s=>s.alive)];
+    if(!entityList.length){ cameraState.targetZoom=1; return; }
+    cameraState.individualIdx=cameraState.individualIdx%entityList.length;
+    const target=entityList[cameraState.individualIdx];
+    cameraState.targetCX=target.x;
+    cameraState.targetCY=target.y;
+    cameraState.targetZoom=3.5;
+  }
+
+  
+  const k=1-Math.exp(-5*dt);
+  cameraState.cx+=(cameraState.targetCX-cameraState.cx)*k;
+  cameraState.cy+=(cameraState.targetCY-cameraState.cy)*k;
+  cameraState.zoom+=(cameraState.targetZoom-cameraState.zoom)*k;
+}
+
+function _updateLMSCamera(dt){
+  if(!killer||!lmsCam.active) return;
+
+  // Update drum intensity
+  const hit=checkDrumHit();
+  const targetIntensity=hit?1.0:0;
+  lmsCam.drumIntensity+=(targetIntensity-lmsCam.drumIntensity)*(1-Math.exp(-12*dt));
+
+  // Auto-cut on strong drum hits (with cooldown)
+  lmsCam.cutCooldown=Math.max(0,lmsCam.cutCooldown-dt);
+  if(hit && lmsCam.drumIntensity>0.55 && lmsCam.cutCooldown<=0){
+    // Pick a new focus: killer or most-at-risk survivor
+    const alive=survivors.filter(s=>s.alive);
+    const candidates=[killer,...alive];
+    // Weight toward entities with active statuses or close to killer
+    let best=killer;
+    let bestScore=-Infinity;
+    for(const e of candidates){
+      const statusCount=Object.keys(e.statuses||{}).filter(k=>e.statuses[k].remaining>0).length;
+      const kd=e===killer?0:Math.hypot(e.x-killer.x,e.y-killer.y);
+      const score=statusCount*80 - kd*0.3 + Math.random()*40;
+      if(score>bestScore){bestScore=score;best=e;}
+    }
+    lmsCam.focusEntity=best;
+    lmsCam.cutCooldown=0.55+Math.random()*0.6;
+    lmsCam.lastCutTime=gameTimer;
+  }
+
+  // Fallback: if no focus or entity dead, pick alive random
+  if(!lmsCam.focusEntity||!lmsCam.focusEntity.alive){
+    const alive=survivors.filter(s=>s.alive);
+    lmsCam.focusEntity=alive.length?alive[Math.floor(Math.random()*alive.length)]:killer;
+  }
+
+  const fe=lmsCam.focusEntity;
+  // Zoom: closer when individual focus, wider when group action
+  const alive=survivors.filter(s=>s.alive);
+  const closeCount=alive.filter(s=>Math.hypot(s.x-killer.x,s.y-killer.y)<280).length;
+  let targetZoom=closeCount>1?2.0:3.2;
+  if(lmsCam.slowTimer>0) targetZoom=3.8; // zoom in during slow-mo
+
+  cameraState.targetCX=fe.x;
+  cameraState.targetCY=fe.y;
+  cameraState.targetZoom=targetZoom;
+}
+
+function applyCameraTransform(){
+  const bob=cameraBeat.bobAmt;
+  const swing=Math.sin(cameraBeat.swingPhase)*cameraBeat.swingAmt*0.08;
+  const beatZoom=1+cameraBeat.zoomAmt;
+  ctx.save();
+
+  if(cameraState.mode==='normal'){
+    
+    ctx.translate(W/2,H/2);
+    ctx.rotate(swing*(Math.PI/180));
+    ctx.scale(beatZoom,beatZoom);
+    ctx.translate(-W/2,-H/2+bob);
+  } else {
+    
+    const totalZoom=cameraState.zoom*beatZoom;
+    ctx.translate(W/2,H/2);
+    ctx.rotate(swing*(Math.PI/180));
+    ctx.scale(totalZoom,totalZoom);
+    ctx.translate(-cameraState.cx,-cameraState.cy+bob/totalZoom);
+  }
+}
+
+function restoreCameraTransform(){
+  ctx.restore();
+}
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const wrap = document.getElementById('canvas-wrap');
+const logEl = document.getElementById('log-inner');
+
+
+const confettiCanvas = document.createElement('canvas');
+confettiCanvas.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:40;';
+wrap.appendChild(confettiCanvas);
+const confettiCtx = confettiCanvas.getContext('2d');
+const confettiParticles = [];
+const runSmokeParticles = [];
+
+
+const bloodDecals    = [];   
+const bloodParticles = [];   
+const explosionList  = [];   
+
+let deathCameraEvent = null; 
+let deathSlowTarget  = 1;    
+let deathSlowFactor  = 1;    
+let parryImpactTimer = 0; 
+const PARRY_IMPACT_DUR = 0.18;
+
+const overlay = document.getElementById('overlay');
+const overlayBox = document.getElementById('overlay-box');
+const tooltipEl = document.getElementById('tooltip');
+
+let W, H;
+function resize() {
+  const r = wrap.getBoundingClientRect();
+  W = canvas.width = r.width; H = canvas.height = r.height;
+  canvas.style.width = r.width + 'px'; canvas.style.height = r.height + 'px';
+  confettiCanvas.width = r.width; confettiCanvas.height = r.height;
+  confettiCanvas.style.width = r.width + 'px'; confettiCanvas.style.height = r.height + 'px';
+}
+window.addEventListener('resize', () => { resize(); _wallDirty=true; });
+// ── Ringmaster mode input ────────────────────────────────────────────
+canvas.addEventListener('mousemove', rmMouseMove, {passive:true});
+canvas.addEventListener('click', rmClick);
+canvas.addEventListener('contextmenu', e=>{ e.preventDefault(); rmRightClick(e); });
+
+function _canvasToWorld(e){
+  const rect=canvas.getBoundingClientRect();
+  const scaleX=W/rect.width, scaleY=H/rect.height;
+  // Account for camera transform
+  const zoom=cameraState.zoom||1;
+  const cx=cameraState.cx||W/2, cy=cameraState.cy||H/2;
+  const screenX=(e.clientX-rect.left)*scaleX;
+  const screenY=(e.clientY-rect.top)*scaleY;
+  const wx=(screenX-W/2)/zoom+cx;
+  const wy=(screenY-H/2)/zoom+cy;
+  return{wx,wy};
+}
+
+function rmMouseMove(e){
+  if(!ringmaster.active||!gameRunning) return;
+  const{wx,wy}=_canvasToWorld(e);
+  const cx=Math.floor(wx/CELL), cy=Math.floor(wy/CELL);
+  if(cx>=0&&cy>=0&&cx<COLS_C&&cy<ROWS_C) ringmaster.previewTile={cx,cy};
+  else ringmaster.previewTile=null;
+}
+
+function rmClick(e){
+  if(!ringmaster.active||!gameRunning) return;
+  const{wx,wy}=_canvasToWorld(e);
+  const cx=Math.floor(wx/CELL), cy=Math.floor(wy/CELL);
+  if(cx<0||cy<0||cx>=COLS_C||cy>=ROWS_C) return;
+  const px=cx*CELL+CELL/2, py=cy*CELL+CELL/2;
+  switch(ringmaster.tool){
+    case 'trap':
+      if(mapGrid[cy][cx]){
+        const trap={x:px,y:py,r:CELL/2,alive:true,improvised:true,
+          stunT:6,blindT:5,slowAmt:0.95,slowDur:5};
+        mines.push(trap);
+        addLog('Ringmaster placed a trap!','skill');
+      }
+      break;
+    case 'wall':
+      if(mapGrid[cy][cx]&&cx>0&&cy>0&&cx<COLS_C-1&&cy<ROWS_C-1){
+        mapGrid[cy][cx]=false;
+        _wallDirty=true;
+        _flowCache.clear();
+        // Dislodge any entity standing in the now-walled tile
+        for(const ent of [killer,...survivors]){
+          if(!ent||!ent.alive) continue;
+          if(Math.floor(ent.x/CELL)===cx&&Math.floor(ent.y/CELL)===cy) pushOutOfWall(ent);
+        }
+        addLog('Ringmaster placed a wall!','skill');
+      }
+      break;
+    case 'floor':
+      if(!mapGrid[cy][cx]&&cx>0&&cy>0&&cx<COLS_C-1&&cy<ROWS_C-1){
+        mapGrid[cy][cx]=true;
+        _wallDirty=true;
+        _flowCache.clear();
+        addLog('Ringmaster opened floor!','skill');
+      }
+      break;
+    case 'spawn_survivor':{
+      const k=ringmaster.spawnKit||'medic';
+      const names=['Aria','Bolt','Crix','Dawn','Echo','Flux','Gale','Hex','Iris','Jade','Kuro','Lyra'];
+      const taken=new Set(survivors.map(s=>s.name));
+      const nm=names.find(n=>!taken.has(n))||'S'+survivors.length;
+      let s;
+      if(k==='engineer')       s=new Engineer(px,py,nm);
+      else if(k==='brawler')   s=new Brawler(px,py,nm);
+      else if(k==='escapee')   s=new Escapee(px,py,nm);
+      else if(k==='recon')     s=new Recon(px,py,nm);
+      else if(k==='commander') s=new Commander(px,py,nm);
+      else if(k==='assault')   s=new Assault(px,py,nm);
+      else if(k==='trapmaker') s=new Trapmaker(px,py,nm);
+      else if(k==='golfer')    s=new Golfer(px,py,nm);
+      else if(k==='sniper')    s=new Sniper(px,py,nm);
+      else                      s=new Medic(px,py,nm);
+      survivors.push(s);
+      // Extend match time so new survivor has a chance
+      gameDuration=Math.max(gameDuration,gameTimer+60);
+      addLog(`Ringmaster spawned ${nm} (${k})!`,'skill');
+      break;
+    }
+    case 'spawn_killer':{
+      // Only one killer supported; teleport/reset instead
+      if(killer&&killer.alive){
+        killer.x=px; killer.y=py;
+        addLog('Ringmaster relocated Killer!','skill');
+      }
+      break;
+    }
+  }
+}
+
+function rmRightClick(e){
+  if(!ringmaster.active||!gameRunning) return;
+  const{wx,wy}=_canvasToWorld(e);
+  // Right-click removes nearest trap or mine within 1 cell
+  let best=null,bestD=CELL*1.5;
+  for(const m of mines){
+    if(!m.alive) continue;
+    const d=Math.hypot(m.x-wx,m.y-wy);
+    if(d<bestD){bestD=d;best=m;}
+  }
+  if(best){best.alive=false;addLog('Ringmaster removed a trap/mine!','skill');}
+}
+resize();
+
+let simSpeed = 1;
+document.getElementById('speed-input').addEventListener('input', function() {
+  simSpeed = parseFloat(this.value);
+  document.getElementById('speed-val').textContent = simSpeed.toFixed(1) + 'x';
+});
+
+const STATUS_DESCRIPTIONS = {
+  stunned: 'Frozen in place — cannot move or use skills.',
+  speed_ii: '+45% move speed, −50% stamina drain.',
+  resistance: '−78% damage taken, −60% stun duration.',
+  self_healing: 'Rooted. Recovering HP over time. Any hit cancels this.',
+  blinded: 'Vision gone — moves in a random wobbling direction.',
+  slowed: 'Move speed reduced.',
+  grabbed: 'Pinned by killer — taking damage every second.',
+  highlighted: 'Sonar-tagged — killer position exposed to all survivors.',
+  fatigued: 'Stamina depleted — move speed −25% until recovered.',
+  cd_boost: 'All skill cooldowns ticking 55% faster.',
+  weakness: 'Taking 45% extra damage from all sources.',
+  punched: 'First punch landed — next hit from same brawler triggers stun combo.',
+  striken: 'Hit by brawler combo — stunned and blinded.',
+  silenced: 'Skills locked out temporarily.',
+  rage: '+85% killer speed, increased damage output.',
+  speed: '+45% move speed from adrenaline burst.',
+  anxious: 'Skills charge 15% faster but taking 10% extra damage.',
+  parry: 'Braced — next killer hit is countered, stunning them 4s.',
+  king_of_rules: 'KING OF RULES — all skill damage ×1.5 until survivors drop to 8.',
+  last_survivor: 'LAST SURVIVOR — fully healed, skills ready, all effects ×3.',
+  cloaked: 'CLOAKED — hidden from enemies for 10 seconds.',
+  bleed: 'BLEED — losing 1% current HP per second as damage over time.',
+  invincibility: 'INVINCIBILITY — immune to all damage, grabs, and debuffs for 1 second.',
+  x_ray: 'X-RAY — LOS range tripled and can see through walls for 6 seconds.',
+  ammo_pack: 'AMMO PACK — all skills have zero cooldown; each use costs 3 seconds.',
+  rocket_boots: 'ROCKET BOOTS — +25% speed, −10% stamina loss; each tile walked costs 2 seconds.',
+  reloading: 'RELOADING — rooted, refilling action. Hit = cancelled + Speed II.',
+  iron_body: 'IRON BODY — permanent 10% reduction to all incoming damage.',
+  charging: 'CHARGING — rooted, action charging. Hit cancels it with no bonus.',
+  carpal_tunnel: 'CARPAL TUNNEL — LOS degrees reduced, gradually restored over half the original duration after expiry.',
+  dancefloor_madness: 'DANCEFLOOR MADNESS — 4+ kills: killer more aggressive, ignores smoke, targets weakest.',
+  scared: 'SCARED — 50% CD speed, Reloading/Charging −35% duration, +50% incoming damage. 15s.',
+  wary: 'WARY — −10% speed, +25% CD speed, Carpal Tunnel −25° for 10s.',
+  survivor_rage: 'RAGE — stun effectivity +10%, ignores killer resistance. Removed on first stun landed or LMS.',
+  furious: 'FURIOUS — 5% resistance, 5% more speed permanently until LMS.',
+  energized: 'ENERGIZED — Charging/Reloading −75% duration, stuns 1.25× stronger.',
+};
+
+const SURVIVOR_SKILLS = {
+  engineer: [
+    {label:'BLD', name:'Build', lmsLabel:'BLD+', lmsName:'Build+', desc:'Place Sonar or Turret (costs scrap).', lmsDesc:'Place Sonar or Turret. Sonar reveals 3× longer, turret fires 3× faster.'},
+    {label:'WRN', name:'Wrench', lmsLabel:'WRN+', lmsName:'Wrench+', desc:'Boost a teammate\'s skill cooldowns by 55% for 10s.', lmsDesc:'Boost a teammate\'s skill cooldowns by 55% for 30s.'},
+  ],
+  brawler: [
+    {label:'PNC', name:'Punch', lmsLabel:'PNC+', lmsName:'Punch+', desc:'Two-hit combo: first slows killer 2s, second stuns 3.5s.', lmsDesc:'Two-hit combo: first slows killer 6s, second stuns 10s.'},
+  ],
+  escapee: [
+    {label:'HLG', name:'Self-Heal', lmsLabel:'HLG+', lmsName:'Self-Heal+', desc:'Root self and recover 45% max HP over 5s. Interrupted by hits.', lmsDesc:'Root self and recover 135% max HP over 15s. Interrupted by hits.'},
+    {label:'SLG', name:'Slingshot', lmsLabel:'SLG+', lmsName:'Slingshot+', desc:'Charge and fire a pebble — stuns killer 0.5–1.5s based on charge.', lmsDesc:'Charge and fire a pebble — stuns killer 1–4s based on charge.'},
+  ],
+  medic: [
+    {label:'LNK', name:'Link', lmsLabel:'LNK+', lmsName:'Link+', desc:'Beam heals an injured teammate 3.6 HP/s for 22s.', lmsDesc:'Beam heals an injured teammate 10 HP/s for 22s.'},
+    {label:'SHL', name:'Self-Heal', lmsLabel:'SHL+', lmsName:'Self-Heal+', desc:'Heal 40 HP instantly. Each use permanently reduces max HP by 15%.', lmsDesc:'Heal 120 HP instantly. Each use reduces max HP by only 5%.'},
+  ],
+  recon: [
+    {label:'SCN', name:'Mine Scan', lmsLabel:'SCN+', lmsName:'Mine Scan+', desc:'Reveal all mines within 195px to the whole team for 14s.', lmsDesc:'Reveal all mines within 195px to the whole team for 42s.'},
+    {label:'SMK', name:'Smokescreen', lmsLabel:'SMK+', lmsName:'Smokescreen+', desc:'Deploy smoke — blinds killer for 3s on entry for 9s.', lmsDesc:'Deploy smoke — blinds killer for 9s on entry, lasts 27s.'},
+  ],
+  commander: [
+    {label:'DRP', name:'Airdrop', lmsLabel:'DRP+', lmsName:'Airdrop+', desc:'Drop a supply box at your position — lands in 12s, grants X-Ray, Ammo Pack, or Rocket Boots to the first survivor who touches it. 75s CD.', lmsDesc:'Same, but 37s CD.'},
+    {label:'RAY', name:'Ray Beam', lmsLabel:'RAY+', lmsName:'Ray Beam+', desc:'Fire a 4s beam at the killer: 55% slow on killer, 15% slow on self, drains killer positive statuses. 60s CD.', lmsDesc:'8s beam duration, 30s CD.'},
+  ],
+  assault: [
+    {label:'GRN', name:'Grenade', lmsLabel:'GRN+', lmsName:'Grenade+', desc:'Throw a grenade at the killer (0.5–3s stun based on proximity). 30s CD.', lmsDesc:'Stun 1.5–9s, 15s CD.'},
+    {label:'PST', name:'Pistol', lmsLabel:'PST+', lmsName:'Pistol+', desc:'5-bullet pistol. Each bullet: 1s stun, 2s blind. Empty mag triggers 10s reload. 1s between shots.', lmsDesc:'2s stun, 4s blind per shot, 0.5s between shots.'},
+  ],
+  trapmaker: [
+    {label:'DST', name:'Destroy Mine', lmsLabel:'DST+', lmsName:'Destroy Mine+', desc:'Walk adjacent to a revealed mine and root for 6s to defuse it. 50s CD.', lmsDesc:'25s CD.'},
+    {label:'TRP', name:'Improvised Trap', lmsLabel:'TRP+', lmsName:'Improvised Trap+', desc:'Root 4s then place a trap that stuns killer 6s, blinds 5s, slows 95%. Max 3 traps. 35s CD.', lmsDesc:'Stun 12s, blind 10s, 17s CD.'},
+  ],
+  golfer: [
+    {label:'SWG', name:'Swing', lmsLabel:'SWG+', lmsName:'Swing+', desc:'Position near ball and swing toward killer with 4-bounce guide. 10s CD, −30% speed 2s.', lmsDesc:'Ball speed +35%, stun 4s.'},
+    {label:'FLG', name:'Flag', lmsLabel:'FLG+', lmsName:'Flag+', desc:'Place flag on current tile — blocks killer mines. Max 5 flags. 15s CD.', lmsDesc:'Max 8 flags, 7s CD.'},
+    {label:'RCL', name:'Recall', lmsLabel:'RCL+', lmsName:'Recall+', desc:'(LMS only) Recall golf ball to your position. Rooted until it arrives. 20s CD.', lmsDesc:'20s CD.'},
+  ],
+  sniper: [
+    {label:'AIM', name:'Snipe', lmsLabel:'AIM+', lmsName:'Snipe+', desc:'Charge 0–10s for 1.25×–2× stun bonus. Wall-piercing, global range. 55s CD.', lmsDesc:'Stun ×3, 27s CD.'},
+    {label:'SDA', name:'Soda', lmsLabel:'SDA+', lmsName:'Soda+', desc:'Energized 30s. Shooting cancels it (Fatigued 3s). Expiry: Speed II + Invincibility + Instant Shot. 80s CD.', lmsDesc:'40s CD.'},
+  ],
+};
+
+const COLS = {
+  killer:'#c8643c', eng:'#f3d27a', brawler:'#6e2a2a', escapee:'#f3d27a', medic:'#d98a3d', recon:'#f3d27a',
+  mine:'#d98a3d', sonar:'#f3d27a', turret:'#d98a3d', missile:'#f3d27a', wrench:'#d98a3d',
+  pebble:'#f3d27a', link:'#d98a3d',
+  gb0:'#14100c', gb1:'#6e2a2a', gb2:'#d98a3d', gb3:'#f3d27a'
+};
+
+
+const SURVIVOR_STATE_TIER = {
+  'patrol':      0,
+  'high-alert':  1,
+  'chase-ender': 2,
+  'flee':        3,
+  'fight':       4,
+  'panic':       5,
+};
+
+const SURVIVOR_DOWNGRADE_LOCKOUT = [0, 5.0, 9.0, 14.0, 20.0, 28.0];
+
+const KILLER_STATE_TIER = {
+  'wander': 0,
+  'chase':  1,
+  'rage':   2,
+  'forced': 3,
+};
+const KILLER_DOWNGRADE_LOCKOUT = [0, 6.0, 12.0, 18.0];
+
+const CELL = 80;
+let COLS_C, ROWS_C;
+let mapGrid = [];
+let navNodes = [];
+let navAdj = [];
+let cellToNav = null;
+
+function genMap() {
+  COLS_C = Math.max(9, Math.floor(W / CELL));
+  ROWS_C = Math.max(9, Math.floor(H / CELL));
+  mapGrid = Array.from({length:ROWS_C}, () => new Array(COLS_C).fill(false));
+
+  // Use pre-match seed if set
+  let _seedVal=0;
+  if(typeof _pmSeedOverride!=='undefined'&&_pmSeedOverride!==''){
+    let h=0;
+    for(let ci=0;ci<_pmSeedOverride.length;ci++){h=Math.imul(31,h)+_pmSeedOverride.charCodeAt(ci)|0;}
+    _seedVal=(h>>>0)^0x9e3779b9;
+  } else {
+    _seedVal=(Date.now()^0x9e3779b9)>>>0;
+  }
+  let _s=_seedVal>>>0;
+  function rand01(){ _s+=0x6D2B79F5; let t=_s; t=Math.imul(t^(t>>>15),t|1); t^=t+Math.imul(t^(t>>>7),t|61); return((t^(t>>>14))>>>0)/4294967296; }
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(rand01()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; }
+
+  const corridorW = 1;
+  const cellsX = Math.floor((COLS_C-1)/(corridorW+1));
+  const cellsY = Math.floor((ROWS_C-1)/(corridorW+1));
+
+  function cellOrigin(cx,cy){ return {tc:cx*(corridorW+1)+1, tr:cy*(corridorW+1)+1}; }
+  function carveCell(cx,cy){
+    const {tc,tr}=cellOrigin(cx,cy);
+    for(let dr=0;dr<corridorW;dr++) for(let dc=0;dc<corridorW;dc++) mapGrid[tr+dr][tc+dc]=true;
+  }
+  function carvePassage(cx1,cy1,cx2,cy2){
+    const {tc:tc1,tr:tr1}=cellOrigin(cx1,cy1);
+    const {tc:tc2,tr:tr2}=cellOrigin(cx2,cy2);
+    const dc=tc2-tc1, dr=tr2-tr1;
+    const wc=tc1+(dc>0?corridorW:dc<0?-1:0);
+    const wr=tr1+(dr>0?corridorW:dr<0?-1:0);
+    const wallW=dc!==0?1:corridorW, wallH=dr!==0?1:corridorW;
+    for(let dr2=0;dr2<wallH;dr2++) for(let dc2=0;dc2<wallW;dc2++) mapGrid[wr+dr2][wc+dc2]=true;
+  }
+
+  const vis = Array.from({length:cellsY},()=>new Array(cellsX).fill(false));
+  function backtrack(cx,cy){
+    vis[cy][cx]=true; carveCell(cx,cy);
+    const dirs=shuffle([[1,0],[-1,0],[0,1],[0,-1]]);
+    for(const [dx,dy] of dirs){
+      const nx=cx+dx,ny=cy+dy;
+      if(nx>=0&&nx<cellsX&&ny>=0&&ny<cellsY&&!vis[ny][nx]){ carvePassage(cx,cy,nx,ny); backtrack(nx,ny); }
+    }
+  }
+  backtrack(Math.floor(cellsX/2), Math.floor(cellsY/2));
+
+  // ── Guaranteed loop pass ─────────────────────────────────────────────────
+  // Walk every wall cell. If removing it would connect two distinct open
+  // regions (i.e. both horizontal OR both vertical neighbours are open but
+  // NOT already connected), carve it. This guarantees at least one real loop.
+  let guaranteedLoopMade = false;
+  // Collect candidate wall cells whose removal creates a cycle
+  const loopCandidates = [];
+  for(let r=2;r<ROWS_C-2;r++){
+    for(let c=2;c<COLS_C-2;c++){
+      if(mapGrid[r][c]) continue; // already open
+      const L=mapGrid[r][c-1], R=mapGrid[r][c+1];
+      const U=mapGrid[r-1][c], D=mapGrid[r+1][c];
+      // Horizontal corridor wall: both sides open, top/bottom closed
+      if(L&&R&&!U&&!D) loopCandidates.push({r,c,axis:'h'});
+      // Vertical corridor wall: top/bottom open, both sides closed
+      else if(U&&D&&!L&&!R) loopCandidates.push({r,c,axis:'v'});
+    }
+  }
+  // Shuffle candidates with the seeded rng and carve the first valid one
+  for(let i=loopCandidates.length-1;i>0;i--){
+    const j=Math.floor(rand01()*(i+1));
+    [loopCandidates[i],loopCandidates[j]]=[loopCandidates[j],loopCandidates[i]];
+  }
+  for(const {r,c} of loopCandidates){
+    mapGrid[r][c]=true;
+    guaranteedLoopMade=true;
+    break;
+  }
+  // If no clean corridor candidate found, force-carve the wall tile closest
+  // to the map centre that has at least two open orthogonal neighbours
+  if(!guaranteedLoopMade){
+    const mr=Math.floor(ROWS_C/2), mc=Math.floor(COLS_C/2);
+    let bestDist=Infinity, bestR=-1, bestC=-1;
+    for(let r=1;r<ROWS_C-1;r++){
+      for(let c=1;c<COLS_C-1;c++){
+        if(mapGrid[r][c]) continue;
+        let opens=0;
+        if(mapGrid[r][c-1]) opens++;
+        if(mapGrid[r][c+1]) opens++;
+        if(mapGrid[r-1]?.[c]) opens++;
+        if(mapGrid[r+1]?.[c]) opens++;
+        if(opens>=2){
+          const d=Math.abs(r-mr)+Math.abs(c-mc);
+          if(d<bestDist){bestDist=d;bestR=r;bestC=c;}
+        }
+      }
+    }
+    if(bestR>=0) mapGrid[bestR][bestC]=true;
+  }
+
+  // ── Additional organic loops ─────────────────────────────────────────────
+  const extraLoops = Math.floor((cellsX*cellsY)*0.12)+6;
+  for(let i=0;i<extraLoops;i++){
+    for(let att=0;att<300;att++){
+      const r=1+Math.floor(rand01()*(ROWS_C-2)), c=1+Math.floor(rand01()*(COLS_C-2));
+      if(mapGrid[r][c]) continue;
+      let opens=0;
+      if(r>0&&mapGrid[r-1][c]) opens++;
+      if(r<ROWS_C-1&&mapGrid[r+1][c]) opens++;
+      if(c>0&&mapGrid[r][c-1]) opens++;
+      if(c<COLS_C-1&&mapGrid[r][c+1]) opens++;
+      if(opens>=2){mapGrid[r][c]=true;break;}
+    }
+  }
+
+  const mx=Math.floor(COLS_C/2), my=Math.floor(ROWS_C/2);
+  for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+    const nx=mx+dx,ny=my+dy;
+    if(nx>0&&ny>0&&nx<COLS_C-1&&ny<ROWS_C-1) mapGrid[ny][nx]=true;
+  }
+
+  for(let cx=0;cx<COLS_C;cx++){mapGrid[0][cx]=false;mapGrid[ROWS_C-1][cx]=false;}
+  for(let cy=0;cy<ROWS_C;cy++){mapGrid[cy][0]=false;mapGrid[cy][COLS_C-1]=false;}
+
+  buildNavmesh();
+  _wallDirty=true;
+}
+
+function buildNavmesh() {
+  navNodes = []; navAdj = [];
+  cellToNav = Array.from({length:ROWS_C}, ()=>new Array(COLS_C).fill(-1));
+  for (let cy=0;cy<ROWS_C;cy++) for (let cx=0;cx<COLS_C;cx++) {
+    if (!mapGrid[cy][cx]) continue;
+    const idx = navNodes.length;
+    navNodes.push({x:cx*CELL+CELL/2, y:cy*CELL+CELL/2, cx, cy, idx});
+    cellToNav[cy][cx] = idx;
+  }
+  const DIRS8 = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1},{dx:1,dy:1},{dx:-1,dy:1},{dx:1,dy:-1},{dx:-1,dy:-1}];
+  for (let i=0;i<navNodes.length;i++) {
+    navAdj.push([]);
+    const {cx,cy} = navNodes[i];
+    for (const {dx,dy} of DIRS8) {
+      const nx=cx+dx, ny=cy+dy;
+      if(nx<0||ny<0||nx>=COLS_C||ny>=ROWS_C) continue;
+      if(!mapGrid[ny][nx]) continue;
+      if(dx!==0&&dy!==0 && (!mapGrid[cy][nx]||!mapGrid[ny][cx])) continue;
+      const nIdx = cellToNav[ny][nx];
+      if(nIdx<0) continue;
+      const cost = (dx!==0&&dy!==0) ? 1.414 : 1.0;
+      navAdj[i].push({idx:nIdx, cost});
+    }
+  }
+}
+
+function worldToNav(wx, wy) {
+  const cx=Math.floor(wx/CELL), cy=Math.floor(wy/CELL);
+  if(cx<0||cy<0||cx>=COLS_C||cy>=ROWS_C) return -1;
+  if(mapGrid[cy][cx]) return cellToNav[cy][cx];
+  for (let r=1;r<4;r++) {
+    for (let dy=-r;dy<=r;dy++) for (let dx=-r;dx<=r;dx++) {
+      if(Math.abs(dx)!==r&&Math.abs(dy)!==r) continue;
+      const nx=cx+dx, ny=cy+dy;
+      if(nx<0||ny<0||nx>=COLS_C||ny>=ROWS_C) continue;
+      if(mapGrid[ny][nx]) return cellToNav[ny][nx];
+    }
+  }
+  return 0;
+}
+
+const _flowCache = new Map();
+function getFlowDir(fx, fy, tx, ty) {
+  const tIdx = worldToNav(tx, ty);
+  const fIdx = worldToNav(fx, fy);
+  if(tIdx<0||fIdx<0) return {dx:tx-fx, dy:ty-fy};
+  if(tIdx===fIdx) return {dx:tx-fx, dy:ty-fy};
+
+  let field = _flowCache.get(tIdx);
+  if(!field) {
+    field = bfsFlow(tIdx);
+    _flowCache.set(tIdx, field);
+    if(_flowCache.size>80) _flowCache.delete(_flowCache.keys().next().value);
+  }
+  const d = field[fIdx];
+  if(!d) return {dx:tx-fx, dy:ty-fy};
+  return d;
+}
+
+function bfsFlow(targetIdx) {
+  const field = new Array(navNodes.length).fill(null);
+  const queue = [targetIdx];
+  field[targetIdx] = {dx:0, dy:0};
+  while(queue.length) {
+    const cur = queue.shift();
+    for(const {idx} of navAdj[cur]) {
+      if(field[idx]) continue;
+      const cn=navNodes[cur], nn=navNodes[idx];
+      field[idx] = {dx: cn.x-nn.x, dy: cn.y-nn.y};
+      queue.push(idx);
+    }
+  }
+  return field;
+}
+
+
+class MinHeap{
+  constructor(){this._d=[];}
+  push(cost,idx){this._d.push({c:cost,i:idx});this._up(this._d.length-1);}
+  pop(){const t=this._d[0];const l=this._d.pop();if(this._d.length){this._d[0]=l;this._dn(0);}return t;}
+  get size(){return this._d.length;}
+  _up(i){while(i>0){const p=(i-1)>>1;if(this._d[p].c<=this._d[i].c)break;[this._d[p],this._d[i]]=[this._d[i],this._d[p]];i=p;}}
+  _dn(i){const n=this._d.length;while(true){let s=i,l=2*i+1,r=l+1;if(l<n&&this._d[l].c<this._d[s].c)s=l;if(r<n&&this._d[r].c<this._d[s].c)s=r;if(s===i)break;[this._d[s],this._d[i]]=[this._d[i],this._d[s]];i=s;}}
+}
+
+
+let tileSafety = null;          
+let _killerTileCX = -1, _killerTileCY = -1;
+let debugSafety = false;
+let _cachedMaxSafety = 9; 
+
+function updateTileSafety() {
+  if (!ROWS_C || !COLS_C || !killer) return;
+  if (!tileSafety || tileSafety.length !== ROWS_C * COLS_C)
+    tileSafety = new Uint8Array(ROWS_C * COLS_C);
+
+  const kcx = Math.floor(killer.x / CELL);
+  const kcy = Math.floor(killer.y / CELL);
+  if (kcx === _killerTileCX && kcy === _killerTileCY) return; 
+  _killerTileCX = kcx; _killerTileCY = kcy;
+
+  
+  
+  const safetyGrid = new Uint8Array(ROWS_C * COLS_C); 
+  safetyGrid.fill(255);
+
+  
+  function orthoExits(cx, cy){
+    let n=0;
+    if(cx>0        && mapGrid[cy][cx-1]) n++;
+    if(cx<COLS_C-1 && mapGrid[cy][cx+1]) n++;
+    if(cy>0        && mapGrid[cy-1][cx]) n++;
+    if(cy<ROWS_C-1 && mapGrid[cy+1][cx]) n++;
+    return n;
+  }
+
+  
+  
+  function enterCost(cx, cy){
+    const exits = orthoExits(cx, cy);
+    if(exits <= 1) return 1;   
+    if(exits === 2) return 2;  
+    if(exits === 3) return 4;  
+    return 6;                  
+  }
+
+  
+  const MAX_SAFETY = 9;
+  const COST_SCALE = 2.5; 
+  const startIdx = kcx >= 0 && kcy >= 0 && kcx < COLS_C && kcy < ROWS_C
+    ? kcy * COLS_C + kcx : -1;
+
+  if(startIdx >= 0 && mapGrid[kcy][kcx]){
+    const dist2 = new Float32Array(ROWS_C * COLS_C).fill(Infinity);
+    dist2[startIdx] = 0;
+    
+    const pq = new MinHeap();
+    pq.push(0, startIdx);
+
+    while(pq.size){
+      const {c:cost, i:idx} = pq.pop();
+      if(cost > dist2[idx]) continue;
+
+      const cy2 = Math.floor(idx / COLS_C);
+      const cx2 = idx % COLS_C;
+
+      
+      safetyGrid[idx] = Math.min(MAX_SAFETY, Math.floor(cost / COST_SCALE));
+
+      
+      for(const [ddx,ddy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const nx2 = cx2+ddx, ny2 = cy2+ddy;
+        if(nx2<0||ny2<0||nx2>=COLS_C||ny2>=ROWS_C) continue;
+        if(!mapGrid[ny2][nx2]) continue;
+        const nIdx = ny2*COLS_C+nx2;
+        const newCost = cost + enterCost(nx2, ny2);
+        if(newCost < dist2[nIdx]){
+          dist2[nIdx] = newCost;
+          pq.push(newCost, nIdx);
+        }
+      }
+    }
+  }
+
+  
+  let _ms=0;
+  for(let cy=0;cy<ROWS_C;cy++){
+    for(let cx=0;cx<COLS_C;cx++){
+      if(!mapGrid[cy][cx]){ tileSafety[cy*COLS_C+cx]=0; continue; }
+      const v = safetyGrid[cy*COLS_C+cx];
+      const sv = v===255 ? MAX_SAFETY : v;
+      tileSafety[cy*COLS_C+cx] = sv;
+      if(sv>_ms) _ms=sv;
+    }
+  }
+  _cachedMaxSafety=_ms;
+}
+
+function getTileSafety(cx, cy) {
+  if (!tileSafety || cx < 0 || cy < 0 || cx >= COLS_C || cy >= ROWS_C) return 9;
+  return tileSafety[cy * COLS_C + cx];
+}
+
+function worldSafety(wx, wy) {
+  return getTileSafety(Math.floor(wx / CELL), Math.floor(wy / CELL));
+}
+
+function drawTileSafety() {
+  if (!tileSafety || !debugSafety) return;
+  ctx.font = '9px VCROSD,monospace';
+  ctx.textAlign = 'center';
+  for (let cy = 0; cy < ROWS_C; cy++) {
+    for (let cx = 0; cx < COLS_C; cx++) {
+      if (!mapGrid[cy][cx]) continue;
+      const v = tileSafety[cy * COLS_C + cx];
+      
+      const alpha = 0.18 + (v / 9) * 0.42;
+      const r = Math.round(15  + (v / 9) * (139 - 15));
+      const g = Math.round(56  + (v / 9) * (188 - 56));
+      const b = 15;
+      ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+      ctx.fillRect(cx * CELL, cy * CELL, CELL, CELL);
+      ctx.fillStyle = v <= 2
+        ? `rgba(110,42,42,0.85)`
+        : `rgba(216,138,61,0.85)`;
+      ctx.fillText(v, cx * CELL + CELL / 2, cy * CELL + CELL / 2 + 4);
+    }
+  }
+  ctx.textAlign = 'left';
+}
+
+function moveEntity(entity, dx, dy, spd, dt) {
+  if(!dx&&!dy) return;
+  const len=Math.hypot(dx,dy)||1;
+  const vx=(dx/len)*spd*dt, vy=(dy/len)*spd*dt;
+  let nx=entity.x+vx, ny=entity.y+vy;
+  const r=entity.r;
+
+  nx=Math.max(r, Math.min(W-r, nx));
+  ny=Math.max(r, Math.min(H-r, ny));
+
+  const _setFacing=(a)=>{ if('facingTarget' in entity) entity.facingTarget=a; else entity.facing=a; };
+
+  const cx=Math.floor(nx/CELL), cy=Math.floor(ny/CELL);
+  const inWall=cx<0||cy<0||cx>=COLS_C||cy>=ROWS_C||!mapGrid[cy][cx];
+
+  if(!inWall){
+    if(Math.abs(vx)>0.001||Math.abs(vy)>0.001) _setFacing(Math.atan2(vy,vx));
+    entity.x=nx; entity.y=ny; return;
+  }
+
+  
+  const cx2=Math.floor((entity.x+vx)/CELL), cy2=Math.floor(entity.y/CELL);
+  const slideX=cx2>=0&&cy2>=0&&cx2<COLS_C&&cy2<ROWS_C&&mapGrid[cy2][cx2];
+  if(slideX){
+    const fx=Math.max(r,Math.min(W-r,entity.x+vx));
+    if(Math.abs(vx)>0.001) _setFacing(Math.atan2(0,vx));
+    entity.x=fx; return;
+  }
+
+  const cx3=Math.floor(entity.x/CELL), cy3=Math.floor((entity.y+vy)/CELL);
+  const slideY=cx3>=0&&cy3>=0&&cx3<COLS_C&&cy3<ROWS_C&&mapGrid[cy3][cx3];
+  if(slideY){
+    const fy=Math.max(r,Math.min(H-r,entity.y+vy));
+    if(Math.abs(vy)>0.001) _setFacing(Math.atan2(vy,0));
+    entity.y=fy; return;
+  }
+
+  
+  
+  
+  
+  const ecx=Math.floor(entity.x/CELL), ecy=Math.floor(entity.y/CELL);
+  let bestOpen=null, bestDot=-Infinity;
+  for(const [ddx,ddy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+    const nx2=ecx+ddx, ny2=ecy+ddy;
+    if(nx2<0||ny2<0||nx2>=COLS_C||ny2>=ROWS_C||!mapGrid[ny2][nx2]) continue;
+    
+    const dot=(ddx*(dx/len))+(ddy*(dy/len));
+    if(dot>bestDot){ bestDot=dot; bestOpen={cx:nx2,cy:ny2}; }
+  }
+  if(bestOpen){
+    const tcx=bestOpen.cx*CELL+CELL/2;
+    const tcy=bestOpen.cy*CELL+CELL/2;
+    const nudgeX=tcx-entity.x, nudgeY=tcy-entity.y;
+    const nudgeLen=Math.hypot(nudgeX,nudgeY)||1;
+    
+    const nudgeSpd=Math.max(spd,60);
+    entity.x=Math.max(r,Math.min(W-r,entity.x+(nudgeX/nudgeLen)*nudgeSpd*dt));
+    entity.y=Math.max(r,Math.min(H-r,entity.y+(nudgeY/nudgeLen)*nudgeSpd*dt));
+    _setFacing(Math.atan2(nudgeY,nudgeX));
+  }
+}
+
+function pushOutOfWall(entity){
+  const cx=Math.floor(entity.x/CELL), cy=Math.floor(entity.y/CELL);
+  if(cx>=0&&cy>=0&&cx<COLS_C&&cy<ROWS_C&&mapGrid[cy][cx]) return;
+  for(let r=1;r<6;r++){
+    for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+      if(Math.abs(dx)!==r&&Math.abs(dy)!==r) continue;
+      const nx=cx+dx, ny=cy+dy;
+      if(nx<0||ny<0||nx>=COLS_C||ny>=ROWS_C) continue;
+      if(mapGrid[ny][nx]){
+        entity.x=nx*CELL+CELL/2;
+        entity.y=ny*CELL+CELL/2;
+        if('velX' in entity){entity.velX=0;entity.velY=0;}
+        return;
+      }
+    }
+  }
+}
+
+function randPos(margin=60) {
+  const open=[];
+  for(let cy=1;cy<ROWS_C-1;cy++) for(let cx=1;cx<COLS_C-1;cx++) {
+    if(!mapGrid[cy][cx]) continue;
+    const px=cx*CELL+CELL/2, py=cy*CELL+CELL/2;
+    if(px>margin&&py>margin&&px<W-margin&&py<H-margin) open.push({x:px,y:py});
+  }
+  if(!open.length) return {x:W/2,y:H/2};
+  const base=open[Math.floor(Math.random()*open.length)];
+  const jitter=(Math.random()-0.5)*CELL*0.72;
+  const jitterY=(Math.random()-0.5)*CELL*0.72;
+  const jx=Math.max(margin,Math.min(W-margin,base.x+jitter));
+  const jy=Math.max(margin,Math.min(H-margin,base.y+jitterY));
+  const cx=Math.floor(jx/CELL),cy=Math.floor(jy/CELL);
+  if(cx>=0&&cy>=0&&cx<COLS_C&&cy<ROWS_C&&mapGrid[cy][cx]) return {x:jx,y:jy};
+  return base;
+}
+
+function randOpenNear(ex, ey, minDist, maxDist) {
+  const open=[];
+  for(let cy=1;cy<ROWS_C-1;cy++) for(let cx=1;cx<COLS_C-1;cx++) {
+    if(!mapGrid[cy][cx]) continue;
+    const px=cx*CELL+CELL/2, py=cy*CELL+CELL/2;
+    const d=Math.hypot(px-ex,py-ey);
+    if(d>=minDist&&d<=maxDist) open.push({x:px,y:py});
+  }
+  return open.length ? open[Math.floor(Math.random()*open.length)] : randPos(60);
+}
+
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+function angle(a,b){return Math.atan2(b.y-a.y,b.x-a.x);}
+function rand(a,b){return a+Math.random()*(b-a);}
+function randSign(){return Math.random()<0.5?1:-1;}
+function lerpAngle(a,b,t){let d=((b-a+Math.PI*3)%(Math.PI*2))-Math.PI;return a+d*t;}
+function angleDiff(a,b){let d=((b-a+Math.PI*3)%(Math.PI*2))-Math.PI;return Math.abs(d);}
+
+function inLOS(from, to) {
+  const steps=12, dx=(to.x-from.x)/steps, dy=(to.y-from.y)/steps;
+  for(let i=1;i<steps;i++) {
+    const sx=from.x+dx*i, sy=from.y+dy*i;
+    const cx=Math.floor(sx/CELL), cy=Math.floor(sy/CELL);
+    if(cx<0||cy<0||cx>=COLS_C||cy>=ROWS_C||!mapGrid[cy][cx]) return false;
+  }
+  return true;
+}
+
+
+function spawnConfetti(count=110){
+  for(let i=0;i<count;i++){
+    confettiParticles.push({
+      x:Math.random()*W, y:-8-Math.random()*80,
+      vx:(Math.random()-0.5)*140, vy:55+Math.random()*160,
+      size:4+Math.random()*10,
+      hue:Math.floor(Math.random()*360),
+      rot:Math.random()*360, rotSpd:(Math.random()-0.5)*420,
+      shape:Math.random()<0.55?'rect':'circle',
+      life:1, decay:0.28+Math.random()*0.18,
+    });
+  }
+}
+function updateConfetti(dt){
+  confettiCtx.clearRect(0,0,confettiCanvas.width,confettiCanvas.height);
+  for(let i=confettiParticles.length-1;i>=0;i--){
+    const p=confettiParticles[i];
+    p.vy+=220*dt; p.vx*=Math.exp(-0.55*dt);
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.rot+=p.rotSpd*dt;
+    p.life-=p.decay*dt;
+    if(p.y>confettiCanvas.height+24||p.life<=0){confettiParticles.splice(i,1);continue;}
+    confettiCtx.save();
+    confettiCtx.globalAlpha=Math.max(0,p.life);
+    confettiCtx.translate(p.x,p.y);
+    confettiCtx.rotate(p.rot*Math.PI/180);
+    confettiCtx.fillStyle=`hsl(${p.hue},88%,62%)`;
+    if(p.shape==='rect'){confettiCtx.fillRect(-p.size/2,-p.size*0.28,p.size,p.size*0.55);}
+    else{confettiCtx.beginPath();confettiCtx.ellipse(0,0,p.size*0.42,p.size*0.28,0,0,Math.PI*2);confettiCtx.fill();}
+    confettiCtx.restore();
+  }
+}
+
+function spawnRunSmoke(x, y){
+  runSmokeParticles.push({
+    x: x + (Math.random()-0.5)*8,
+    y: y + (Math.random()-0.5)*4,
+    vx: (Math.random()-0.5)*18,
+    vy: -6 - Math.random()*10,
+    r: 2 + Math.random()*3,
+    life: 1,
+    decay: 1.8 + Math.random()*1.4,
+  });
+}
+
+function updateAndDrawRunSmoke(dt){
+  for(let i=runSmokeParticles.length-1;i>=0;i--){
+    const p=runSmokeParticles[i];
+    p.life-=p.decay*dt;
+    if(p.life<=0){runSmokeParticles.splice(i,1);continue;}
+    p.x+=p.vx*dt; p.y+=p.vy*dt;
+    p.r+=dt*5;
+    const a=p.life*0.28;
+    ctx.globalAlpha=a;
+    ctx.fillStyle='rgba(110,42,42,1)';
+    ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0.3,p.r),0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+
+const _BC=['#6b0000','#880000','#aa0000','#7a0010','#550000','#990008'];
+function _rbc(){return _BC[Math.floor(Math.random()*_BC.length)];}
+
+function spawnBlood(x,y,type,srcX,srcY){
+  const cfg={
+    hit:  {n:9,  minR:1.5,maxR:4.5,vMin:35, vMax:155,trail:0.25,sR:7, sA:0.68,sL:3.5},
+    death:{n:55, minR:3,  maxR:9,  vMin:55, vMax:295,trail:1.0, sR:24,sA:0.88,sL:7.0},
+    mine: {n:85, minR:4,  maxR:14, vMin:80, vMax:420,trail:1.0, sR:34,sA:0.93,sL:9.5},
+  }[type]||{n:9,minR:1.5,maxR:4.5,vMin:35,vMax:155,trail:0.25,sR:7,sA:0.68,sL:3.5};
+
+  const hasDir=srcX!==undefined&&srcY!==undefined;
+  const awayA=hasDir?Math.atan2(y-srcY,x-srcX):Math.random()*Math.PI*2;
+  const spread=type==='hit'?Math.PI*1.3:Math.PI*2;
+
+  
+  bloodDecals.push({x,y,r:cfg.sR*(0.85+Math.random()*0.3),color:_rbc(),
+    alpha:cfg.sA,maxAlpha:cfg.sA,life:cfg.sL,maxLife:cfg.sL,
+    angle:awayA, scaleX:1+Math.random()*0.6, scaleY:0.55+Math.random()*0.45});
+  
+  const blobs=type==='hit'?3:type==='death'?10:14;
+  for(let j=0;j<blobs;j++){
+    const bA=awayA+(Math.random()-0.5)*(type==='hit'?Math.PI*0.8:Math.PI*2);
+    const bDist=cfg.sR*(0.3+Math.random()*0.95);
+    bloodDecals.push({
+      x:x+Math.cos(bA)*bDist, y:y+Math.sin(bA)*bDist,
+      r:cfg.sR*(0.12+Math.random()*0.42),color:_rbc(),
+      alpha:cfg.sA*0.72,maxAlpha:cfg.sA*0.72,life:cfg.sL*0.85,maxLife:cfg.sL*0.85,
+      angle:bA, scaleX:0.8+Math.random()*0.7, scaleY:0.4+Math.random()*0.55});
+  }
+  
+  const streaks=type==='hit'?2:type==='death'?6:9;
+  for(let j=0;j<streaks;j++){
+    const sA=awayA+(Math.random()-0.5)*(type==='hit'?0.55:1.1);
+    const sDist=cfg.sR*(0.8+Math.random()*2.2);
+    bloodDecals.push({
+      x:x+Math.cos(sA)*sDist, y:y+Math.sin(sA)*sDist,
+      r:cfg.sR*(0.08+Math.random()*0.18),color:_rbc(),
+      alpha:cfg.sA*0.55,maxAlpha:cfg.sA*0.55,life:cfg.sL*0.7,maxLife:cfg.sL*0.7,
+      angle:sA, scaleX:2.5+Math.random()*3.5, scaleY:0.25+Math.random()*0.3});
+  }
+  
+  for(let i=0;i<cfg.n;i++){
+    const a=awayA+(Math.random()-0.5)*spread;
+    const spd=cfg.vMin+Math.random()*(cfg.vMax-cfg.vMin);
+    const life=0.3+Math.random()*0.6;
+    const restitution = 0.28 + Math.random() * 0.32;
+    bloodParticles.push({
+      x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd-(type!=='hit'?rand(15,75):0),
+      r:cfg.minR+Math.random()*(cfg.maxR-cfg.minR),color:_rbc(),
+      life,maxLife:life,leaveTrail:Math.random()<cfg.trail,trailTimer:0,type,
+      bounces:0, maxBounces: type==='mine'?5 : type==='death'?3 : 1,
+      restitution,
+    });
+  }
+}
+
+function updateBlood(dt){
+  for(let i=bloodParticles.length-1;i>=0;i--){
+    const p=bloodParticles[i];
+    p.life-=dt;
+    if(p.life<=0){
+      bloodDecals.push({x:p.x,y:p.y,
+        r:Math.max(1,p.r*(0.6+Math.random()*0.5)),color:p.color,
+        alpha:0.70,maxAlpha:0.70,
+        life:p.type==='mine'?7.5:p.type==='death'?5.5:3.0,
+        maxLife:p.type==='mine'?7.5:p.type==='death'?5.5:3.0,
+        angle:Math.atan2(p.vy,p.vx), scaleX:1.2+Math.random()*0.8, scaleY:0.45+Math.random()*0.4});
+      bloodParticles.splice(i,1);continue;
+    }
+    
+const STEPS = 3;
+const subDt = dt / STEPS;
+for(let step = 0; step < STEPS; step++){
+  p.x += p.vx * subDt;
+  p.y += p.vy * subDt;
+  p.vy += 130 * subDt;
+  p.vx *= Math.exp(-1.4 * subDt);
+
+  let bounced = false;
+
+  
+  if(p.x - p.r < 0){
+    p.x = p.r; p.vx = Math.abs(p.vx) * p.restitution; bounced = true;
+  } else if(p.x + p.r > W){
+    p.x = W - p.r; p.vx = -Math.abs(p.vx) * p.restitution; bounced = true;
+  }
+  if(p.y - p.r < 0){
+    p.y = p.r; p.vy = Math.abs(p.vy) * p.restitution; bounced = true;
+  } else if(p.y + p.r > H){
+    
+    p.y = H - p.r; p.vy = -Math.abs(p.vy) * p.restitution; bounced = true;
+  }
+
+  
+  const cx = Math.floor(p.x / CELL);
+  const cy = Math.floor(p.y / CELL);
+  const inWall = cx < 0 || cy < 0 || cx >= COLS_C || cy >= ROWS_C || !mapGrid[cy]?.[cx];
+  if(inWall){
+    
+    const openX = (px => {
+      const c2 = Math.floor(px / CELL);
+      return c2 >= 0 && c2 < COLS_C && mapGrid[cy]?.[c2];
+    })(p.x - Math.sign(p.vx) * CELL * 0.5);
+    const openY = (py => {
+      const r2 = Math.floor(py / CELL);
+      return r2 >= 0 && r2 < ROWS_C && mapGrid[r2]?.[cx];
+    })(p.y - Math.sign(p.vy) * CELL * 0.5);
+
+    if(openX && !openY){
+      p.vy = -p.vy * p.restitution;
+      p.vx *=  p.restitution;
+      
+      p.y = (Math.floor(p.y / CELL) + (p.vy > 0 ? 0.1 : 0.9)) * CELL;
+    } else if(openY && !openX){
+      p.vx = -p.vx * p.restitution;
+      p.vy *=  p.restitution;
+      p.x = (Math.floor(p.x / CELL) + (p.vx > 0 ? 0.1 : 0.9)) * CELL;
+    } else {
+      
+      p.vx = -p.vx * p.restitution;
+      p.vy = -p.vy * p.restitution;
+      pushOutOfWall(p);
+    }
+    bounced = true;
+  }
+
+  if(bounced){
+    p.bounces++;
+    const speed = Math.hypot(p.vx, p.vy);
+    
+    if(speed > 18){
+      const splatR = p.r * (0.9 + Math.random() * 0.8) * (1 + p.bounces * 0.15);
+      const impactA = Math.atan2(p.vy, p.vx) + Math.PI;
+      bloodDecals.push({
+        x: p.x + rand(-splatR * 0.3, splatR * 0.3),
+        y: p.y + rand(-splatR * 0.3, splatR * 0.3),
+        r: splatR, color: p.color,
+        alpha: 0.55 * (p.life / p.maxLife),
+        maxAlpha: 0.55 * (p.life / p.maxLife),
+        life: p.type === 'mine' ? 6.5 : p.type === 'death' ? 4.5 : 2.5,
+        maxLife: p.type === 'mine' ? 6.5 : p.type === 'death' ? 4.5 : 2.5,
+        angle: impactA, scaleX: 1.4+Math.random()*1.8, scaleY: 0.3+Math.random()*0.4,
+      });
+    }
+    
+    if(p.bounces >= p.maxBounces || speed < 8){
+      p.life = 0;
+    }
+  }
+}
+    if(p.leaveTrail){
+      p.trailTimer+=dt;
+      const interval=p.type==='mine'?0.035:0.065;
+      if(p.trailTimer>=interval){
+        p.trailTimer=0;
+        const lr=Math.max(0,p.life/p.maxLife);
+        const tr=p.r*lr*(0.28+Math.random()*0.22);
+        if(tr>0.25) bloodDecals.push({
+          x:p.x+rand(-1.5,1.5),y:p.y+rand(-1.5,1.5),r:tr,color:p.color,
+          alpha:0.48*lr,maxAlpha:0.48*lr,
+          life:p.type==='mine'?5.5:4.0,maxLife:p.type==='mine'?5.5:4.0});
+      }
+    }
+  }
+  for(let i=bloodDecals.length-1;i>=0;i--){
+    const d=bloodDecals[i];
+    d.life-=dt;
+    if(d.life<=0){bloodDecals.splice(i,1);continue;}
+    d.alpha=d.maxAlpha*(d.life/d.maxLife);
+  }
+  if(bloodDecals.length>900)    bloodDecals.splice(0,bloodDecals.length-900);
+  if(bloodParticles.length>500) bloodParticles.splice(0,bloodParticles.length-500);
+}
+
+function drawBlood(){
+  for(const d of bloodDecals){
+    if(d.alpha<0.008)continue;
+    ctx.globalAlpha=Math.min(0.94,d.alpha);
+    ctx.fillStyle=d.color;
+    if(d.scaleX!==undefined&&(d.scaleX!==1||d.scaleY!==1)){
+      ctx.save();
+      ctx.translate(d.x,d.y);
+      ctx.rotate(d.angle||0);
+      ctx.scale(d.scaleX,d.scaleY);
+      ctx.beginPath();ctx.arc(0,0,Math.max(0.4,d.r),0,Math.PI*2);ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.beginPath();ctx.arc(d.x,d.y,Math.max(0.4,d.r),0,Math.PI*2);ctx.fill();
+    }
+  }
+  for(const p of bloodParticles){
+    const lr=Math.max(0,p.life/p.maxLife);
+    if(lr<0.01)continue;
+    ctx.globalAlpha=lr*0.88;
+    ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0.4,p.r*lr),0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+
+function spawnExplosion(x,y){
+  const parts=[];
+  for(let i=0;i<42;i++){
+    const a=Math.random()*Math.PI*2,spd=60+Math.random()*265;
+    parts.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd-rand(20,105),
+      r:2+Math.random()*7,hue:8+Math.random()*52,life:1,
+      decay:0.82+Math.random()*1.35,kind:'spark'});
+  }
+  for(let i=0;i<18;i++){
+    const a=Math.random()*Math.PI*2,spd=28+Math.random()*135;
+    parts.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd-rand(10,55),
+      r:4+Math.random()*9,hue:16+Math.random()*28,life:1,
+      decay:0.38+Math.random()*0.58,kind:'debris'});
+  }
+  for(let i=0;i<11;i++){
+    parts.push({x:x+rand(-20,20),y:y+rand(-20,20),vx:rand(-48,48),vy:rand(-68,-18),
+      r:7+Math.random()*15,lum:26+Math.random()*30,life:1,
+      decay:0.36+Math.random()*0.32,kind:'smoke'});
+  }
+  explosionList.push({x,y,parts,
+    ring:{r:4,maxR:145,a:1},ring2:{r:2,maxR:88,a:0.65},flash:{a:1},life:1.5});
+}
+
+function updateExplosions(dt){
+  for(let i=explosionList.length-1;i>=0;i--){
+    const ex=explosionList[i];
+    ex.life-=dt;
+    if(ex.life<=0){explosionList.splice(i,1);continue;}
+    ex.flash.a=Math.max(0,ex.flash.a-dt*4.5);
+    ex.ring.r+=dt*365;ex.ring.a=Math.max(0,1-ex.ring.r/ex.ring.maxR);
+    ex.ring2.r+=dt*235;ex.ring2.a=Math.max(0,0.65-ex.ring2.r/ex.ring2.maxR*0.65);
+    for(let j=ex.parts.length-1;j>=0;j--){
+      const p=ex.parts[j];
+      p.life-=p.decay*dt;
+      if(p.life<=0){ex.parts.splice(j,1);continue;}
+      p.x+=p.vx*dt;p.y+=p.vy*dt;
+      if(p.kind!=='smoke'){p.vy+=95*dt;p.vx*=Math.exp(-1.6*dt);}
+      else{p.r+=dt*17;p.vy*=Math.exp(-0.7*dt);p.vx*=Math.exp(-0.9*dt);}
+    }
+  }
+}
+
+function drawExplosions(){
+  for(const ex of explosionList){
+    if(ex.flash.a>0.01){
+      const g=ctx.createRadialGradient(ex.x,ex.y,0,ex.x,ex.y,82);
+      g.addColorStop(0,`rgba(255,245,190,${ex.flash.a*0.82})`);
+      g.addColorStop(0.45,`rgba(255,130,30,${ex.flash.a*0.5})`);
+      g.addColorStop(1,'rgba(255,60,0,0)');
+      ctx.fillStyle=g;ctx.globalAlpha=1;
+      ctx.beginPath();ctx.arc(ex.x,ex.y,82,0,Math.PI*2);ctx.fill();
+    }
+    if(ex.ring.a>0.01){
+      ctx.globalAlpha=ex.ring.a;ctx.strokeStyle='#ff8800';ctx.lineWidth=3.5;
+      ctx.beginPath();ctx.arc(ex.x,ex.y,ex.ring.r,0,Math.PI*2);ctx.stroke();
+    }
+    if(ex.ring2.a>0.01){
+      ctx.globalAlpha=ex.ring2.a;ctx.strokeStyle='#ffee44';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(ex.x,ex.y,ex.ring2.r,0,Math.PI*2);ctx.stroke();
+    }
+    ctx.lineWidth=1;
+    for(const p of ex.parts){
+      if(p.life<=0)continue;
+      if(p.kind==='smoke'){
+        ctx.globalAlpha=p.life*0.27;
+        const lum=p.lum||40;
+        ctx.fillStyle=`rgb(${lum*2|0},${lum*2|0},${lum*2|0})`;
+        ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0.5,p.r),0,Math.PI*2);ctx.fill();
+      }else if(p.kind==='spark'){
+        ctx.globalAlpha=Math.min(0.95,p.life*0.9);
+        ctx.fillStyle=`hsl(${p.hue},100%,${35+p.life*45}%)`;
+        ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0.4,p.r*p.life),0,Math.PI*2);ctx.fill();
+      }else{
+        ctx.globalAlpha=Math.min(0.9,p.life*0.85);
+        ctx.fillStyle=`hsl(${p.hue},75%,${22+p.life*22}%)`;
+        ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0.4,p.r),0,Math.PI*2);ctx.fill();
+      }
+    }
+  }
+  ctx.globalAlpha=1;ctx.lineWidth=1;
+}
+
+
+</script>
+
+<!-- ── Kits ── -->
+<script src="src/kits/killer.js"></script>
+<script src="src/kits/survivor.js"></script>
+<script src="src/kits/engineer.js"></script>
+<script src="src/kits/brawler.js"></script>
+<script src="src/kits/escapee.js"></script>
+<script src="src/kits/medic.js"></script>
+<script src="src/kits/recon.js"></script>
+<script src="src/kits/golfer.js"></script>
+<script src="src/kits/sniper.js"></script>
+<script src="src/kits/commander.js"></script>
+<script src="src/kits/assault.js"></script>
+<script src="src/kits/trapmaker.js"></script>
+
+<!-- ── Core engine continued: LMS constants, status helpers, game state ── -->
+<script>
+
+const _LMS_NEGATIVE_STATUSES=['stunned','blinded','slowed','grabbed','weakness','silenced','punched','striken','bleed','fatigued','scared','carpal_tunnel','dancefloor_madness'];
+const _LMS_ACTION_STATUSES=['self_healing','reloading','charging'];
+const _LMS_POSITIVE_STATUSES=['cd_boost','speed','speed_ii','resistance','invincibility','x_ray','ammo_pack','rocket_boots','iron_body','cloaked','parry','energized','wary','furious','survivor_rage','anxious'];
+
+function applyStatus(e,name,dur,data={}){
+  if(!e.statuses)e.statuses={};
+  // Guard: dur must be a positive number
+  if(!dur || isNaN(dur) || dur <= 0) dur = 0.1;
+  // LMS scaling: only applied to survivors that are LMS, never to killer
+  if(e.lmsActive && e !== killer){
+    if(_LMS_NEGATIVE_STATUSES.includes(name)) dur=Math.max(0.1,dur/3);
+    else if(_LMS_ACTION_STATUSES.includes(name)) dur=Math.max(0.1,dur/3);
+    else if(_LMS_POSITIVE_STATUSES.includes(name)) dur=dur*3;
+  }
+  // Global duration override from pre-match config
+  if(typeof _pmStatusDurOverrides!=='undefined'&&_pmStatusDurOverrides[name]){
+    const ov=_pmStatusDurOverrides[name];
+    if(ov.perm) dur=99999;
+    else if(ov.dur!=null) dur=ov.dur;
+  }
+  if(name==='stunned'&&hasStatus(e,'king_of_rules')) return;
+  if(name==='stunned'&&hasStatus(e,'resistance')) dur*=0.4;
+  if((name==='reloading'||name==='charging')&&hasStatus(e,'scared')) dur*=0.65;
+  if((name==='reloading'||name==='charging')&&hasStatus(e,'energized')) dur*=0.25;
+
+  const negativeStatuses=['stunned','blinded','slowed','grabbed','highlighted','weakness','silenced','punched','striken','bleed','fatigued'];
+  if(hasStatus(e,'invincibility')&&negativeStatuses.includes(name)) return;
+  if(e.statuses[name]&&e.statuses[name].remaining>=dur)return;
+  e.statuses[name]={remaining:dur,data};
+}
+function hasStatus(e,name){return!!(e.statuses&&e.statuses[name]&&e.statuses[name].remaining>0);}
+function getStatus(e,name){return e.statuses&&e.statuses[name];}
+function clearStatus(e,name){if(e.statuses)delete e.statuses[name];}
+function tickStatuses(e,dt){
+  if(!e.statuses)return;
+  for(const k of Object.keys(e.statuses)){
+    if(!e.statuses[k]) continue;
+    // Permanent statuses (99999 sentinel) never tick down
+    if(e.statuses[k].remaining>=99998) { continue; }
+    
+    if(k==='bleed'&&e.alive&&!hasStatus(e,'invincibility')){
+      const bleedDmg=Math.max(0.1,e.hp*0.01)*dt;
+      e.hp=Math.max(1,e.hp-bleedDmg); 
+      if(!e._bleedSplatTimer) e._bleedSplatTimer=0;
+      e._bleedSplatTimer+=dt;
+      if(e._bleedSplatTimer>=1){
+        e._bleedSplatTimer=0;
+        
+        const bvx=e.velX||0,bvy=e.velY||0,bvl=Math.hypot(bvx,bvy);
+        if(bvl>5) spawnBlood(e.x,e.y,'hit',e.x+(bvx/bvl)*20,e.y+(bvy/bvl)*20);
+        else spawnBlood(e.x,e.y,'hit');
+      }
+    }
+    e.statuses[k].remaining-=dt;
+    if(e.statuses[k].remaining<=0){
+      if(k==='carpal_tunnel'){
+        const ct=e.statuses[k];
+        const recDur=Math.ceil((ct.data.origDur||5)/2);
+        e._ctRecover={timer:recDur,maxTimer:recDur,degreesReduced:ct.data.degreesReduced||0};
+      }
+      if(k==='wary') clearStatus(e,'carpal_tunnel');
+      delete e.statuses[k];
+      if(k==='weakness'||k==='stunned') applyStatus(e,'resistance',8,{});
+    }
+  }
+  if(e._ctRecover){
+    e._ctRecover.timer=Math.max(0,e._ctRecover.timer-dt);
+    if(e._ctRecover.timer<=0) e._ctRecover=null;
+  }
+}
+
+let killer=null, survivors=[], mines=[], buildings=[], projectiles=[], scraps=[], smokescreens=[];
+let killerElimCount=0, gameDuration=180, gameTimer=0;
+let gameRunning=false, gameOver=false, lastTime=0, frameId=0;
+
+
+const killerMemory = {
+  eliminationCount: 0,
+  stunsReceived: 0,
+  smokeEncounters: 0,
+};
+
+// ── Ringmaster mode ─────────────────────────────────────────────────
+const ringmaster = {
+  active: false,
+  tool: 'trap',        // 'trap'|'wall'|'floor'|'spawn_survivor'|'spawn_killer'
+  spawnKit: 'medic',   // kit to spawn when tool==='spawn_survivor'
+  pendingWall: null,   // {cx,cy} tile being placed
+  traps: [],           // {x,y,r,alive,stunT,blindT,slowAmt,slowDur}
+  previewTile: null,   // {cx,cy} hovered tile
+  enabled: true,
+};
+
+// Skill class constants (mirrors SKILL_CLASS in survivor.js)
+const SKILL_CLASS_TAGS = {
+  SUPPORT:   'support',
+  OFFENSIVE: 'offensive',
+  DEFENSIVE: 'defensive',
+  SELF:      'self',
+  TEAM:      'team',
+  RECALL:    'recall',
+  RECHARGE:  'recharge',
+  MISC:      'misc',
+};
+
+</script>
+
+<!-- ── Game systems: buildings, projectiles, mines, smokescreens ── -->
+<script>
+function updateBuildings(dt){
+  for(const b of buildings){
+    if(!b.alive)continue;
+    b.timer-=dt;if(b.timer<=0){b.alive=false;continue;}
+    if(b.type==='sonar'){
+      if(dist(b,killer)<b.radius){
+        applyStatus(killer,'highlighted',0.5,{});b.timer-=dt*1.5;
+        for(const s of survivors)if(s.alive&&dist(s,b)<b.radius+120){
+          s.receiveSignal({x:killer.x,y:killer.y},1);
+          s.alertLevel=Math.max(s.alertLevel,2);s.alertTimer=Math.max(s.alertTimer,6);
+        }
+      }
+    }
+    if(b.type==='turret'){
+      b.missile1CD=(b.missile1CD||0)-dt;b.missile2CD=(b.missile2CD||30)-dt;
+      if(dist(b,killer)<b.radius){
+        if(b.missile1CD<=0){fireTurretMissile(b);b.missile1CD=30;}
+        else if(b.missile2CD<=0){fireTurretMissile(b);b.missile2CD=30;}
+      }
+    }
+  }
+  for(let i=buildings.length-1;i>=0;i--)if(!buildings[i].alive)buildings.splice(i,1);
+}
+function fireTurretMissile(b){
+  const a=angle(b,killer);
+  projectiles.push({type:'missile',x:b.x,y:b.y,vx:Math.cos(a)*360,vy:Math.sin(a)*360,alive:true,age:0,id:Math.random()});
+  addLog('Turret missile fired!','skill');
+}
+function drawBuildings(){
+  for(const b of buildings){
+    if(!b.alive)continue;
+    if(b.type==='sonar'){
+      ctx.strokeStyle=COLS.gb2;ctx.lineWidth=1;ctx.setLineDash([3,5]);
+      ctx.strokeRect(b.x-b.radius,b.y-b.radius,b.radius*2,b.radius*2);ctx.setLineDash([]);
+      ctx.fillStyle=COLS.gb1;ctx.fillRect(b.x-8,b.y-8,16,16);
+      ctx.fillStyle=COLS.gb3;ctx.fillRect(b.x-6,b.y-6,12,12);
+      ctx.fillStyle=COLS.gb0;ctx.font='8px VCROSD,monospace';ctx.textAlign='center';ctx.fillText('S',b.x,b.y+3);ctx.textAlign='left';
+      const pct=b.timer/8;
+      ctx.fillStyle=COLS.gb0;ctx.fillRect(b.x-9,b.y-13,18,3);
+      ctx.fillStyle=COLS.gb2;ctx.fillRect(b.x-9,b.y-13,Math.round(18*Math.min(1,pct)),3);
+    }
+    if(b.type==='turret'){
+      ctx.fillStyle=COLS.gb0;ctx.fillRect(b.x-9+1,b.y-9+1,18,18);
+      ctx.fillStyle=COLS.gb2;ctx.fillRect(b.x-9,b.y-9,18,18);
+      ctx.fillStyle=COLS.gb3;ctx.fillRect(b.x-9,b.y-9,4,4);
+      ctx.strokeStyle=COLS.gb1;ctx.lineWidth=1;ctx.setLineDash([3,6]);
+      ctx.strokeRect(b.x-b.radius,b.y-b.radius,b.radius*2,b.radius*2);ctx.setLineDash([]);
+      ctx.fillStyle=COLS.gb0;ctx.font='8px VCROSD,monospace';ctx.textAlign='center';ctx.fillText('T',b.x,b.y+3);ctx.textAlign='left';
+    }
+  }
+}
+
+
+function updateProjectiles(dt){
+  for(const p of projectiles){
+    if(!p.alive)continue;
+    if(p.type==='missile'){
+      p.x+=p.vx*dt;p.y+=p.vy*dt;p.age+=dt;
+      const a=angle(p,killer);p.vx+=(Math.cos(a)*360-p.vx)*dt*2.5;p.vy+=(Math.sin(a)*360-p.vy)*dt*2.5;
+      if(dist(p,killer)<22){applyStatus(killer,'stunned',2.5,{});killer.releaseGrab?.();killer.onStunned?.();p.alive=false;addLog('Missile hit! Killer stunned','stun');}
+      if(p.age>10||p.x<0||p.x>W||p.y<0||p.y>H)p.alive=false;
+    }
+    if(p.type==='pebble'){
+      if(!p.vx&&!p.vy){const a=Math.atan2(p.ty-p.y,p.tx-p.x);p.vx=Math.cos(a)*p.speed;p.vy=Math.sin(a)*p.speed;}
+      p.x+=p.vx*dt;p.y+=p.vy*dt;
+      if(dist(p,killer)<22){applyStatus(killer,'stunned',p.stun,{});killer.releaseGrab?.();killer.onStunned?.();if(p.slow>0)applyStatus(killer,'slowed',3,{amount:p.slow});p.alive=false;addLog(`Pebble hit! ${p.stun.toFixed(1)}s stun`,'stun');}
+      if(p.x<0||p.x>W||p.y<0||p.y>H||dist(p,{x:p.tx,y:p.ty})<12)p.alive=false;
+    }
+    if(p.type==='grenade'){
+      p.age+=dt;
+      if(p.sliding){
+        
+        const friction=Math.exp(-3.5*dt);
+        p.vx*=friction; p.vy*=friction;
+        p.x+=p.vx*dt; p.y+=p.vy*dt;
+        
+        const gcx=Math.floor(p.x/CELL),gcy=Math.floor(p.y/CELL);
+        if(gcx<0||gcy<0||gcx>=COLS_C||gcy>=ROWS_C||!mapGrid[gcy]?.[gcx]){
+          const prevX=p.x-p.vx*dt, prevY=p.y-p.vy*dt;
+          const px2=Math.floor(prevX/CELL),py2=Math.floor(prevY/CELL);
+          const xOpen=px2>=0&&py2>=0&&px2<COLS_C&&py2<ROWS_C&&mapGrid[py2]?.[px2];
+          const yOpen=gcx>=0&&gcx<COLS_C&&py2>=0&&py2<ROWS_C&&mapGrid[py2]?.[gcx];
+          if(xOpen){p.vy=-p.vy*0.45;p.y=Math.max(0,Math.min(H,p.y));}
+          else if(yOpen){p.vx=-p.vx*0.45;p.x=Math.max(0,Math.min(W,p.x));}
+          else{p.vx=-p.vx*0.4;p.vy=-p.vy*0.4;}
+        }
+        const gspeed=Math.hypot(p.vx,p.vy);
+        const gkd=dist(p,killer);
+        
+        if(gspeed<14||gkd<48||p.age>8){
+          spawnExplosion(p.x,p.y);
+          spawnBlood(p.x,p.y,'mine',p.x,p.y);
+          // Splash damage to survivors near explosion
+          for(const s of survivors){
+            if(!s.alive) continue;
+            const sd=dist(p,s);
+            if(sd<120){
+              const dmg=Math.max(1, Math.round(5*(1-sd/120)));
+              s.takeDamage(dmg,null);
+              spawnBlood(s.x,s.y,'hit',p.x,p.y);
+            }
+          }
+          if(gkd<75){
+            applyStatus(killer,'stunned',p.stunT,{});killer.releaseGrab?.();killer.onStunned?.();
+            addLog(`Grenade hit! ${p.stunT.toFixed(1)}s stun`,'stun');
+          } else if(gkd<150){
+            applyStatus(killer,'stunned',Math.max(0.3,p.stunT*0.45),{});killer.releaseGrab?.();killer.onStunned?.();
+            addLog(`Grenade near hit! ${(p.stunT*0.45).toFixed(1)}s stun`,'stun');
+          }
+          p.alive=false;
+        }
+      } else {
+        
+        if(!p.vx&&!p.vy){const a=Math.atan2(p.ty-p.y,p.tx-p.x);p.vx=Math.cos(a)*p.speed;p.vy=Math.sin(a)*p.speed;}
+        p.x+=p.vx*dt;p.y+=p.vy*dt;
+        const gd=dist(p,killer);
+        if(gd<50||p.age>4){
+          spawnExplosion(p.x,p.y);spawnBlood(p.x,p.y,'mine',p.x,p.y);
+          if(gd<50){applyStatus(killer,'stunned',p.stunT,{});killer.releaseGrab?.();killer.onStunned?.();addLog(`Grenade hit! ${p.stunT.toFixed(1)}s stun`,'stun');}
+          p.alive=false;
+        }
+      }
+      if(p.x<0||p.x>W||p.y<0||p.y>H) p.alive=false;
+    }
+    if(p.type==='wrench'){
+      if(!p.target||!p.target.alive){p.alive=false;continue;}
+      const a=angle(p,p.target);p.x+=Math.cos(a)*p.speed*dt;p.y+=Math.sin(a)*p.speed*dt;
+      if(dist(p,p.target)<16)p.alive=false;
+    }
+  }
+  for(let i=projectiles.length-1;i>=0;i--)if(!projectiles[i].alive)projectiles.splice(i,1);
+}
+function drawProjectiles(){
+  for(const p of projectiles){
+    if(!p.alive)continue;
+    if(p.type==='missile'){
+      ctx.fillStyle=COLS.gb0;ctx.fillRect(p.x-4+1,p.y-4+1,8,8);
+      ctx.fillStyle=COLS.gb3;ctx.fillRect(p.x-4,p.y-4,8,8);
+      ctx.fillStyle=COLS.gb2;ctx.fillRect(p.x-4,p.y-4,3,3);
+    }
+    if(p.type==='pebble'){
+      ctx.fillStyle=COLS.gb2;ctx.fillRect(p.x-3,p.y-3,6,6);
+    }
+    if(p.type==='grenade'){
+      ctx.fillStyle='#888800';ctx.fillRect(p.x-4,p.y-4,8,8);
+      ctx.fillStyle=COLS.gb3;ctx.fillRect(p.x-3,p.y-3,6,6);
+    }
+    if(p.type==='wrench'){
+      ctx.fillStyle=COLS.gb1;ctx.fillRect(p.x-4+1,p.y-4+1,8,8);
+      ctx.fillStyle=COLS.gb3;ctx.fillRect(p.x-4,p.y-4,8,8);
+    }
+  }
+}
+
+
+function updateMines(dt){
+  for(const m of mines){
+    if(!m.alive)continue;
+    if(m.revealed){
+      m.revealTimer=(m.revealTimer||0)-dt;
+      if(m.revealTimer<=0){m.revealed=false;m.revealTimer=0;}
+    }
+    if(!m.improvised){
+      for(const s of survivors){
+        if(!s.alive)continue;
+        if(dist(m,s)<m.r){
+          const mineDmg=5*killer.korMult();
+          spawnExplosion(m.x,m.y);
+          spawnBlood(s.x,s.y,'mine',m.x,m.y);
+          s.takeDamage(mineDmg,killer);applyStatus(s,'blinded',5,{});m.alive=false;
+          const idx=mines.indexOf(m);if(idx>=0)mines.splice(idx,1);
+          if(killer.myMines){const ki=killer.myMines.indexOf(m);if(ki>=0)killer.myMines.splice(ki,1);}
+          addLog(`Mine hit ${s.name}! (-${mineDmg}, blinded 5s)`,'kill');
+          break;
+        }
+      }
+    }
+    
+    if(m.improvised&&killer.alive&&dist(m,killer)<m.r){
+      spawnExplosion(m.x,m.y);
+      applyStatus(killer,'stunned',m.stunT,{});
+      applyStatus(killer,'blinded',m.blindT,{});
+      applyStatus(killer,'slowed',m.slowDur,{amount:m.slowAmt});
+      killer.releaseGrab?.();killer.onStunned?.();
+      m.alive=false;
+      const idx=mines.indexOf(m);if(idx>=0)mines.splice(idx,1);
+      
+      for(const s of survivors){
+        if(s.kit==='trapmaker'){const ti=s.improvisedMines.indexOf(m);if(ti>=0)s.improvisedMines.splice(ti,1);}
+      }
+      addLog(`Improvised trap hit killer! [STUN ${m.stunT}s | BLIND ${m.blindT}s | SLOW 95%]`,'stun');
+    }
+  }
+}
+function drawMines(){
+  for(const m of mines){
+    if(!m.alive)continue;
+    const pulse=Math.sin(Date.now()/300)>0;
+    if(m.revealed){
+      ctx.strokeStyle=pulse?COLS.gb3:COLS.gb2;ctx.lineWidth=1;ctx.setLineDash([2,2]);
+      ctx.strokeRect(m.x-m.r,m.y-m.r,m.r*2,m.r*2);ctx.setLineDash([]);
+      ctx.fillStyle='rgba(216,138,61,0.10)';ctx.fillRect(m.x-m.r,m.y-m.r,m.r*2,m.r*2);
+      ctx.fillStyle=pulse?COLS.gb3:COLS.gb2;ctx.fillRect(m.x-3,m.y-3,6,6);
+    } else {
+      ctx.strokeStyle='rgba(110,42,42,0.35)';ctx.lineWidth=1;ctx.setLineDash([2,4]);
+      ctx.strokeRect(m.x-m.r,m.y-m.r,m.r*2,m.r*2);ctx.setLineDash([]);
+      ctx.fillStyle=COLS.gb1;ctx.fillRect(m.x-3,m.y-3,6,6);
+    }
+  }
+}
+
+
+function updateSmokescreens(dt){
+  for(const sm of smokescreens){
+    if(!sm.alive)continue;
+    sm.timer-=dt;
+    if(sm.timer<=0){sm.alive=false;continue;}
+    const kInside=dist(sm,killer)<sm.r&&killer.alive&&!hasStatus(killer,'stunned');
+    if(kInside){
+      if(!sm.killerInside){
+        sm.killerInsideTimer=0;
+      }
+      sm.killerInsideTimer=(sm.killerInsideTimer||0)+dt;
+      sm.killerInside=true;
+    }
+    if(kInside&&(sm.killerInsideTimer||0)>=0.18&&!sm.killerBlinded){
+      sm.killerBlinded=true;
+      if(!hasStatus(killer,'blinded')){
+        const threshold=Math.max(0,1-killerMemory.smokeEncounters*0.30);
+        if(Math.random()<threshold){
+          killer.onBlinded();
+          applyStatus(killer,'blinded',3.0,{});
+          killerMemory.smokeEncounters++;
+          addLog('Killer blinded by smokescreen!','stun');
+        } else {
+          addLog('Killer evaded the smokescreen!','skill');
+        }
+      }
+    }
+    if(!kInside){ sm.killerInside=false; sm.killerInsideTimer=0; sm.killerBlinded=false; }
+  }
+  for(let i=smokescreens.length-1;i>=0;i--)if(!smokescreens[i].alive)smokescreens.splice(i,1);
+}
+
+</script>
+
+<!-- ── UI ── -->
+<script src="src/ui/cursor.js"></script>
+<script src="src/ui/hud.js"></script>
+<script src="src/ui/renderer.js"></script>
+<script src="src/ui/prematch.js"></script>
+</body>
+</html>

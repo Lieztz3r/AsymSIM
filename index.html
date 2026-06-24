@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graveyard Shift at Sparkle's</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>%F0%9F%92%80</text></svg>">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── index landing: GSaS haunted-lavender twist ── */
+.title-main {
+  font-size: clamp(1.5rem, 5.2vw, 3.4rem);
+  text-shadow: 3px 3px 0 var(--accent-dk), 0 0 22px rgba(var(--glow), 0.45);
+  margin-bottom: 0.1em;
+}
+.title-main .spark { color: var(--accent); }
+.title-sub { opacity: 0.85; margin-bottom: 0.4em; }
+.tagline {
+  font-family: var(--font);
+  font-size: clamp(0.5rem, 1vw, 0.74rem);
+  color: var(--gb2);
+  letter-spacing: 0.12em;
+  max-width: 46ch;
+  line-height: 1.9;
+  text-align: center;
+  opacity: 0.78;
+  margin-bottom: 0.4em;
+  animation: fadein 1.6s ease both;
+}
+
+/* Menu of routes */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85em;
+  margin-top: 0.6em;
+  width: min(86vw, 360px);
+  animation: fadein 2s ease both;
+}
+.menu .gs-btn { justify-content: space-between; width: 100%; }
+.menu .gs-btn .ico { font-size: 1.2em; }
+.menu .gs-btn .lbl { flex: 1; text-align: left; margin-left: 0.6em; }
+
+.footnote {
+  margin-top: 1.6em;
+  font-family: var(--font);
+  font-size: clamp(0.4rem, 0.8vw, 0.58rem);
+  color: var(--gb1);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  animation: fadein 2.4s ease both;
+}
+</style>
+</head>
+<body>
+
+<div id="screen">
+  <div class="gb-grid"></div>
+
+  <!-- decorative frame corners -->
+  <span class="corner tl"></span>
+  <span class="corner tr"></span>
+  <span class="corner bl"></span>
+  <span class="corner br"></span>
+
+  <!-- drifting decorative glyphs -->
+  <span class="float-glyph" style="top:14%;left:11%;font-size:1.4rem;animation-delay:0s">✦</span>
+  <span class="float-glyph" style="top:74%;left:84%;font-size:1.1rem;animation-delay:1.4s">❉</span>
+  <span class="float-glyph" style="top:22%;left:82%;font-size:0.9rem;animation-delay:2.7s">✶</span>
+  <span class="float-glyph" style="top:80%;left:13%;font-size:1.2rem;animation-delay:3.6s">☾</span>
+
+  <div class="screen-content">
+    <h1 class="title-main">GRAVEYARD&nbsp;SHIFT<br>at&nbsp;<span class="spark">SPARKLE'S</span></h1>
+    <p class="title-sub">A late-night horror in green&nbsp;—&nbsp;now bathed in ghostlight</p>
+
+    <div class="rune-divider">✦ ❉ ✦</div>
+
+    <p class="tagline">The fluorescent lights never worked right. Nobody who closed the
+      store ever talked about aisle nine. Pick how you want to be haunted tonight.</p>
+
+    <nav class="menu">
+      <a class="gs-btn" href="page1.html">
+        <span class="ico">📖</span><span class="lbl">Read the Comic</span><span class="kbd-hint">STORY</span>
+      </a>
+      <a class="gs-btn" href="asymmetry.html">
+        <span class="ico">🔪</span><span class="lbl">Play Asymmetry</span><span class="kbd-hint">KILLER vs SURVIVORS</span>
+      </a>
+      <a class="gs-btn" href="minigame.html">
+        <span class="ico">🔦</span><span class="lbl">Graveyard Shift</span><span class="kbd-hint">MINIGAME</span>
+      </a>
+    </nav>
+
+    <p class="footnote">↑↓ select &nbsp;·&nbsp; Enter to open</p>
+  </div>
+
+  <div class="crt-scanlines"></div>
+  <div class="crt-vignette"></div>
+  <div class="crt-bevel"></div>
+  <div class="crt-corners"></div>
+  <div class="crt-hline"></div>
+</div>
+
+<canvas id="debris-canvas"></canvas>
+<div id="cursor-layer"></div>
+
+<script src="main.js"></script>
+<script>
+/* Keyboard navigation for the menu — more user-friendly */
+(function () {
+  const items = Array.from(document.querySelectorAll('.menu .gs-btn'));
+  if (!items.length) return;
+  let idx = 0;
+  function focus(i) {
+    idx = (i + items.length) % items.length;
+    items[idx].focus();
+  }
+  focus(0);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); focus(idx + 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); focus(idx - 1); }
+    else if (e.key === 'Enter') { const a = items[idx]; if (a) a.click(); }
+  });
+})();
+</script>
+</body>
+</html>
